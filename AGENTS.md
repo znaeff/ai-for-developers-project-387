@@ -2,8 +2,8 @@
 
 ## Toolchain
 
-- `mise.toml` pins **both Node 22 and pnpm 12.18.0**. Run `mise install` first and use `mise exec -- <cmd>` (or a `mise run` task); a globally installed pnpm/Node may differ.
-- The verification gate is `mise run check`: `pnpm generate:check` → `pnpm lint` → `pnpm typecheck` → `pnpm test` → `pnpm test:e2e` → `pnpm docker:build` → `pnpm docker:smoke`, strictly in that order (`mise.toml`). Run it before finishing a change; CI runs the same command after `pnpm install --frozen-lockfile` and Playwright browser installation. The full check requires a running Docker daemon. Use `mise run check:fast` for the subset without generation, e2e and Docker.
+- `mise.toml` pins **Node 22**, **pnpm 12.18.0** and **jactionlint 2.6.0**. Run `mise install` first and use `mise exec -- <cmd>` (or a `mise run` task); a globally installed pnpm/Node may differ.
+- The verification gate is `mise run check`: `mise run check:workflows` → `pnpm generate:check` → `pnpm lint` → `pnpm typecheck` → `pnpm test` → `pnpm test:e2e` → `pnpm docker:build` → `pnpm docker:smoke`, strictly in that order (`mise.toml`). `check:workflows` runs `jactionlint .github/workflows/*.yml` with config in `.github/jactionlint.yaml`. Run the full check before finishing a change; CI runs the same command after `pnpm install --frozen-lockfile` and Playwright browser installation. The full check requires a running Docker daemon. Use `mise run check:fast` for the subset without generation, e2e and Docker.
 - Focused checks: `mise exec -- pnpm --filter @app/backend test -- src/app.test.ts`, `mise exec -- pnpm --filter @app/backend typecheck`, `mise exec -- pnpm --filter @app/frontend typecheck`.
 
 ## Layout and wiring
@@ -31,7 +31,7 @@
 - `POST /__test__/reset` (through Vite: `/api/__test__/reset`) clears meeting types and bookings and returns `204`. It exists only when `createServer({ allowTestReset: true })` is used; `index.ts` enables it for `E2E_RESET=1`.
 - Playwright e2e tests live in `e2e-tests/` with the root `playwright.config.ts`. They run against the real Vite dev server and a real backend, both started via `webServer` (the backend with `E2E_RESET=1`). Tests run with `workers: 1` and `fullyParallel: false`, and `e2e-tests/fixtures.ts` resets backend state before each test. They are part of `mise run check`; use `mise run test:e2e` for a focused run.
 - `.github/workflows/hexlet-check.yml` is auto-generated: do not edit, rename, or delete it (see `.github/workflows/README.md`). Hexlet checks run on every push.
-- `.github/workflows/ci.yml` mirrors the local gate on push and pull request; keep it in sync if check steps change. Docker build and container smoke are part of `mise run check`, so there is no separate Docker workflow. `.github/workflows/release-please.yml` runs on `main` and opens release PRs from Conventional Commits.
+- `.github/workflows/ci.yml` mirrors the local gate on push and pull request; keep it in sync if check steps change. Docker build and container smoke are part of `mise run check`, so there is no separate Docker workflow. `.github/workflows/opencode.yml` runs the OpenCode GitHub agent on `/oc` and `/opencode` comments from trusted participants. `.github/workflows/release-please.yml` runs on `main` and opens release PRs from Conventional Commits.
 
 ## Conventions
 
@@ -43,7 +43,7 @@
 
 ### Issue tracker
 
-Issues and specs for this repo live in GitHub Issues (`znaeff/ai-for-developers-project-386`). See `docs/agents/issue-tracker.md`.
+Issues and specs for this repo live in GitHub Issues (`znaeff/ai-for-developers-project-387`). See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
