@@ -1,0 +1,11 @@
+packages:
+  - apps/*
+
+allowBuilds:
+  esbuild: true
+
+minimumReleaseAgeExclude:
+  - '@vitest/mocker@5.1.1'
+  - '@vitest/spy@5.1.1'
+  - lucide-react@1.75.0
+  - vitest@5.1.1

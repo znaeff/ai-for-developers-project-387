@@ -1,0 +1,51 @@
+[tools]
+node = "22"
+pnpm = "12.18.0"
+
+[tasks."generate"]
+description = "Сгенерировать OpenAPI и клиентский SDK из TypeSpec"
+run = "pnpm generate"
+
+[tasks.check]
+description = "Полная проверка: генерация, lint, типы, тесты, e2e и Docker"
+run = [
+  "pnpm generate:check",
+  "pnpm lint",
+  "pnpm typecheck",
+  "pnpm test",
+  "pnpm test:e2e",
+  "pnpm docker:build",
+  "pnpm docker:smoke",
+]
+
+[tasks."check:fast"]
+description = "Быстрая проверка без генерации и e2e"
+run = ["pnpm lint", "pnpm typecheck", "pnpm test"]
+
+[tasks."test:e2e"]
+description = "End-to-end тесты фронтенда через Playwright"
+run = "pnpm test:e2e"
+
+[tasks."docker:build"]
+description = "Собрать Docker-образ приложения"
+run = "pnpm docker:build"
+
+[tasks."docker:smoke"]
+description = "Проверить запущенный Docker-контейнер"
+run = "pnpm docker:smoke"
+
+[tasks."docker:run"]
+description = "Запустить приложение в Docker-контейнере"
+run = "pnpm docker:run"
+
+[tasks.dev]
+description = "Запуск бэкенда и фронтенда одновременно"
+run = "pnpm -r --parallel dev"
+
+[tasks."dev:backend"]
+description = "Запуск только бэкенда"
+run = "pnpm --filter @app/backend dev"
+
+[tasks."dev:frontend"]
+description = "Запуск только фронтенда"
+run = "pnpm --filter @app/frontend dev"
