@@ -1,14 +1,20 @@
 [tools]
 node = "22"
 pnpm = "12.18.0"
+jactionlint = "2.6.0"
+
+[tasks."check:workflows"]
+description = "Проверить GitHub Actions workflow через jactionlint"
+run = "jactionlint .github/workflows/*.yml"
 
 [tasks."generate"]
 description = "Сгенерировать OpenAPI и клиентский SDK из TypeSpec"
 run = "pnpm generate"
 
 [tasks.check]
-description = "Полная проверка: генерация, lint, типы, тесты, e2e и Docker"
+description = "Полная проверка: workflow, генерация, lint, типы, тесты, e2e и Docker"
 run = [
+  "mise run check:workflows",
   "pnpm generate:check",
   "pnpm lint",
   "pnpm typecheck",
@@ -19,8 +25,8 @@ run = [
 ]
 
 [tasks."check:fast"]
-description = "Быстрая проверка без генерации и e2e"
-run = ["pnpm lint", "pnpm typecheck", "pnpm test"]
+description = "Быстрая проверка workflow, без генерации и e2e"
+run = ["mise run check:workflows", "pnpm lint", "pnpm typecheck", "pnpm test"]
 
 [tasks."test:e2e"]
 description = "End-to-end тесты фронтенда через Playwright"

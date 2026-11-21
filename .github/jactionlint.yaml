@@ -1,0 +1,12 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/jdx/jactionlint/main/schema/jactionlint-config.json
+profile: default
+
+ignores:
+  - rule: dangerous-triggers
+    file: .github/workflows/opencode.yml
+    reason: >-
+      issue_comment is required by the documented OpenCode integration. The job
+      is limited to OWNER/MEMBER/COLLABORATOR, the action also checks write
+      permission, uses OIDC app token exchange, read-only contents, no PR
+      checkout and a single OPENCODE_API_KEY secret.
+    expires: "2027-05-21"
