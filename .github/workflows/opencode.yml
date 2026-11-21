@@ -37,4 +37,4 @@ jobs:
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
         with:
-          model: opencode/kimi-k2.7-code
+          model: opencode/glm-5.3
