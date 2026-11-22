@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Button } from '@/components/ui/button'
 import type { Slot } from '@/lib/api'
 import { formatMoscowDay, formatMoscowTime, moscowDayKey } from '@/lib/format'
 
@@ -43,9 +44,28 @@ export function SlotList({ slots, selectedStartsAt, onSelect }: SlotListProps) {
     )
     return new Set(firstWithFreeSlots ? [firstWithFreeSlots.key] : [])
   })
+  const allExpanded =
+    groups.length > 0 && groups.every((group) => expandedDays.has(group.key))
+  const toggleAllLabel = allExpanded ? 'Свернуть все' : 'Развернуть все'
 
   return (
     <div className="space-y-6" data-testid="slot-list">
+      <div className="flex justify-end">
+        <Button
+          aria-label={toggleAllLabel}
+          data-testid="slot-toggle-all"
+          onClick={() =>
+            setExpandedDays(
+              allExpanded ? new Set() : new Set(groups.map((group) => group.key)),
+            )
+          }
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          {toggleAllLabel}
+        </Button>
+      </div>
       {groups.map((group) => {
         const isExpanded = expandedDays.has(group.key)
         const panelId = `slot-day-panel-${group.key}`
