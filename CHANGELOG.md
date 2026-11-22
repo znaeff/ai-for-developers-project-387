@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.8.0](https://github.com/znaeff/ai-for-developers-project-387/compare/calendar-booking-v0.7.0...calendar-booking-v0.8.0) (2026-11-22)
+
+
+### Features
+
+* **frontend:** add collapsible slot days ([#10](https://github.com/znaeff/ai-for-developers-project-387/issues/10)) ([#15](https://github.com/znaeff/ai-for-developers-project-387/issues/15)) ([3dc22df](https://github.com/znaeff/ai-for-developers-project-387/commit/3dc22df288e354853c6ce29deb66374294f751cc))
+* **frontend:** add expand/collapse all days control ([#11](https://github.com/znaeff/ai-for-developers-project-387/issues/11)) ([#16](https://github.com/znaeff/ai-for-developers-project-387/issues/16)) ([ba2bc42](https://github.com/znaeff/ai-for-developers-project-387/commit/ba2bc42407c40a11362fb3401638bdb76b4d2247))
+* **frontend:** lock selected slot day while booking form is open ([#12](https://github.com/znaeff/ai-for-developers-project-387/issues/12)) ([#17](https://github.com/znaeff/ai-for-developers-project-387/issues/17)) ([4688dcc](https://github.com/znaeff/ai-for-developers-project-387/commit/4688dcc15014d4446530db3e363a814d2193a275))
+
+
+### Bug Fixes
+
+* **ci:** align OpenCode workflow with requirements ([#3](https://github.com/znaeff/ai-for-developers-project-387/issues/3)) ([5a9482c](https://github.com/znaeff/ai-for-developers-project-387/commit/5a9482c610bd9def03e54affe35818827e8e29e7))
+* **ci:** let agent publish issues as owner only ([#6](https://github.com/znaeff/ai-for-developers-project-387/issues/6)) ([2986e05](https://github.com/znaeff/ai-for-developers-project-387/commit/2986e05d2706f659600df57ef8a6a3921153bb4e))
+* **ci:** make auto-review workflow shellcheck-clean ([#26](https://github.com/znaeff/ai-for-developers-project-387/issues/26)) ([7f6309d](https://github.com/znaeff/ai-for-developers-project-387/commit/7f6309d3fafea49e13e968bda0ddea15ef860813))
+* **ci:** run reviewer from isolated directory ([#26](https://github.com/znaeff/ai-for-developers-project-387/issues/26)) ([95cffe4](https://github.com/znaeff/ai-for-developers-project-387/commit/95cffe4e3d140796fc91ca07a2673a54be700021))
+* **ci:** use available OpenCode model ([#2](https://github.com/znaeff/ai-for-developers-project-387/issues/2)) ([934ec97](https://github.com/znaeff/ai-for-developers-project-387/commit/934ec97e81018f1b294961d33b9e78621ed5347a))
+
 ## [0.7.0](https://github.com/znaeff/ai-for-developers-project-386/compare/calendar-booking-v0.6.0...calendar-booking-v0.7.0) (2026-11-21)
 
 
