@@ -143,6 +143,72 @@ test('guest expands and collapses days independently', async ({
   await expect(firstDay.getByTestId('slot')).toHaveCount(0)
 })
 
+test('guest expands all days at once from the default compact list', async ({
+  page,
+  request,
+}) => {
+  const { id, title } = await createMeetingTypeViaApi(request)
+  const slots = await listSlots(request, id)
+  const dates = [...new Set(slots.map((slot) => slot.startsAt.slice(0, 10)))]
+  if (dates.length < 2) throw new Error('Expected at least two days')
+
+  await page.goto('/guest')
+  await page.getByRole('button', { name: new RegExp(title) }).click()
+  await expect(page.getByRole('heading', { name: 'Свободные слоты' })).toBeVisible()
+
+  const toggleAll = page.getByTestId('slot-toggle-all')
+  await expect(toggleAll).toHaveText('Развернуть все')
+  await expect(toggleAll).toHaveAttribute('aria-label', 'Развернуть все')
+
+  await toggleAll.click()
+
+  for (const date of dates) {
+    const day = dayByDate(page, date)
+    await expect(day.getByRole('button', { expanded: true })).toBeVisible()
+    await expect(day.getByTestId('slot').first()).toBeVisible()
+  }
+  await expect(toggleAll).toHaveText('Свернуть все')
+  await expect(toggleAll).toHaveAttribute('aria-label', 'Свернуть все')
+})
+
+test('guest collapses all days at once and can expand them again', async ({
+  page,
+  request,
+}) => {
+  const { id, title } = await createMeetingTypeViaApi(request)
+  const slots = await listSlots(request, id)
+  const dates = [...new Set(slots.map((slot) => slot.startsAt.slice(0, 10)))]
+  if (dates.length < 2) throw new Error('Expected at least two days')
+
+  await page.goto('/guest')
+  await page.getByRole('button', { name: new RegExp(title) }).click()
+  await expect(page.getByRole('heading', { name: 'Свободные слоты' })).toBeVisible()
+
+  const toggleAll = page.getByTestId('slot-toggle-all')
+  await toggleAll.click()
+  await expect(toggleAll).toHaveText('Свернуть все')
+
+  await toggleAll.click()
+
+  for (const date of dates) {
+    const day = dayByDate(page, date)
+    await expect(day.getByRole('button', { expanded: false })).toBeVisible()
+    await expect(day.getByTestId('slot')).toHaveCount(0)
+  }
+  await expect(toggleAll).toHaveText('Развернуть все')
+  await expect(toggleAll).toHaveAttribute('aria-label', 'Развернуть все')
+
+  await toggleAll.click()
+
+  for (const date of dates) {
+    const day = dayByDate(page, date)
+    await expect(day.getByRole('button', { expanded: true })).toBeVisible()
+    await expect(day.getByTestId('slot').first()).toBeVisible()
+  }
+  await expect(toggleAll).toHaveText('Свернуть все')
+  await expect(toggleAll).toHaveAttribute('aria-label', 'Свернуть все')
+})
+
 test('guest sees the default day expansion again after reloading slots', async ({
   page,
   request,
