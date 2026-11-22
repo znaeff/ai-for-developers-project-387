@@ -172,7 +172,7 @@ Workflow `.github/workflows/auto-triage.yml` запускается только
 
 Job имеет минимальные права: `contents: read` для checkout скиллов и документации и `issues: write` для меток и комментария. OIDC здесь не используется, поэтому `id-token: write` не выдаётся; `gh` внутри сессии получает короткоживущий `GH_TOKEN` из автоматического `GITHUB_TOKEN`. Ограничения: `timeout-minutes: 15`, concurrency на номер issue без отмены уже идущего прогона, `persist-credentials: false`.
 
-Агент применяет только начальное состояние: одну категорию (`bug` или `enhancement`) и `needs-triage`, затем публикует один комментарий с обязательным дисклеймером скилла и рекомендацией следующего состояния. Он не меняет код, не создаёт коммиты, ветки и pull request, не закрывает issue и не ставит `needs-info`, `ready-for-agent`, `ready-for-human` или `wontfix` без решения мейнтейнера. Прогон виден во вкладке Actions (`workflow: auto-triage`, имя `auto-triage issue #<n>`), результат — метки и комментарий в самом issue.
+Агент применяет только начальное состояние: одну категорию (`bug` или `enhancement`) и `needs-triage`, затем публикует один комментарий с обязательным дисклеймером скилла и рекомендацией следующего состояния. Комментарии триажа пишутся по-русски; канонические метки (`bug`, `enhancement`, `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), пути, команды и идентификаторы кода остаются без перевода. Он не меняет код, не создаёт коммиты, ветки и pull request, не закрывает issue и не ставит `needs-info`, `ready-for-agent`, `ready-for-human` или `wontfix` без решения мейнтейнера. Прогон виден во вкладке Actions (`workflow: auto-triage`, имя `auto-triage issue #<n>`), результат — метки и комментарий в самом issue.
 
 ## Использование
 

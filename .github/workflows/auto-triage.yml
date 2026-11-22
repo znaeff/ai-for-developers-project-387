@@ -62,9 +62,10 @@ jobs:
              implementation of the request and for matching .out-of-scope/ records.
           3. Apply only the initial triage step: add exactly one category label (bug or enhancement)
              and the needs-triage state label.
-          4. Post exactly one comment on that issue. Start it with the disclaimer required by the
-             triage skill. Include the category, the reasoning, where you looked, and a recommendation
-             for the next state.
+          4. Post exactly one comment on that issue. Write the entire comment in Russian, including
+             the disclaimer required by the triage skill. Keep canonical label names, file paths,
+             commands and code identifiers unchanged. Include the category, the reasoning, where you
+             looked, and a recommendation for the next state.
 
           Hard limits:
           - Do not change code, create commits, branches or pull requests.
