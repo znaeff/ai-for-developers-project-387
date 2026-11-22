@@ -174,6 +174,18 @@ Job имеет минимальные права: `contents: read` для checko
 
 Агент применяет только начальное состояние: одну категорию (`bug` или `enhancement`) и `needs-triage`, затем публикует один комментарий с обязательным дисклеймером скилла и рекомендацией следующего состояния. Комментарии триажа пишутся по-русски; канонические метки (`bug`, `enhancement`, `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), пути, команды и идентификаторы кода остаются без перевода. Он не меняет код, не создаёт коммиты, ветки и pull request, не закрывает issue и не ставит `needs-info`, `ready-for-agent`, `ready-for-human` или `wontfix` без решения мейнтейнера. Прогон виден во вкладке Actions (`workflow: auto-triage`, имя `auto-triage issue #<n>`), результат — метки и комментарий в самом issue.
 
+### Авторевью pull request
+
+Workflow `.github/workflows/opencode-review.yml` публикует независимое ревью PR. Он запускается на `pull_request` с типами `opened`, `synchronize`, `reopened`, `ready_for_review` и `edited`; событие `edited` учитывается только при изменении тела PR. Ревью не заменяет решение человека: публикуется только `COMMENT`, без `APPROVE` и `REQUEST_CHANGES`, а merge остаётся ручным.
+
+Проходят только нечерновиковые PR этого же репозитория от `OWNER`, `MEMBER`, `COLLABORATOR` или `opencode-agent[bot]`. PR из fork, черновики и остальные боты уходят в ручное ревью. Права job: `contents: read`, `pull-requests: write`, `issues: write`, `actions: read`, `checks: read`, `statuses: read`; `id-token` не выдаётся. Таймауты: 75 минут у job, 60 у шага модели и 10 у публикации. `concurrency` по номеру PR с `cancel-in-progress: true` отменяет устаревшее ревью при новом push.
+
+Checkout выполняется по точному `head.sha`, а не по merge-ref. Модель работает в отдельном каталоге `$RUNNER_TEMP/review` с `OPENCODE_DISABLE_PROJECT_CONFIG=true`; туда попадают `.review/` и снимок исходников, но не `REVIEW.md`, `AGENTS.md`, `.agents/`, `opencode.json` и другие файлы инструкций/конфигурации из PR. Критерии `REVIEW.md` и `AGENTS.md` читаются из базовой ветки; их доступность записывается в `.review/criteria-status.txt`, а отсутствующий файл помечается `unavailable` и не считается проверенным. Так PR не может ослабить правила своего ревью.
+
+Ревьюер получает diff, изменённые файлы, связанные issues, прошлые ревью и статус обязательной проверки `check` для head SHA. Ожидание CI ограничено 30 минутами; если `check` не завершился, фиксируется `CI pending`, а не вывод о падении. Публикуются общий комментарий и inline-замечания; замечание без подходящей строки остаётся в общем комментарии. На PR действует лимит 5 попыток, попытка резервируется скрытым маркером до вызова модели. Статусы видны в комментариях: `reviewed@<sha>`, `limit-reached` и `error`; отсутствие отчёта не означает отсутствие замечаний.
+
+Шаблон `.github/pull_request_template.md` требует указать проверки с кодом выхода и SHA, риск `R0–R3`, способ отката, разбор замечаний и человеческое решение о merge. Полные критерии и формат замечаний — в `REVIEW.md`.
+
 ## Использование
 
 ```bash

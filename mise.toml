@@ -18,6 +18,7 @@ run = [
   "pnpm generate:check",
   "pnpm lint",
   "pnpm typecheck",
+  "pnpm test:scripts",
   "pnpm test",
   "pnpm test:e2e",
   "pnpm docker:build",
@@ -26,7 +27,7 @@ run = [
 
 [tasks."check:fast"]
 description = "Быстрая проверка workflow, без генерации и e2e"
-run = ["mise run check:workflows", "pnpm lint", "pnpm typecheck", "pnpm test"]
+run = ["mise run check:workflows", "pnpm lint", "pnpm typecheck", "pnpm test:scripts", "pnpm test"]
 
 [tasks."test:e2e"]
 description = "End-to-end тесты фронтенда через Playwright"
