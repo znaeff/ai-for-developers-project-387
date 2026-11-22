@@ -38,6 +38,7 @@ type SlotListProps = {
 
 export function SlotList({ slots, selectedStartsAt, onSelect }: SlotListProps) {
   const groups = groupSlots(slots)
+  const lockedDayKey = selectedStartsAt ? moscowDayKey(selectedStartsAt) : undefined
   const [expandedDays, setExpandedDays] = useState<Set<string>>(() => {
     const firstWithFreeSlots = groups.find((group) =>
       group.slots.some((slot) => slot.isAvailable),
@@ -45,7 +46,10 @@ export function SlotList({ slots, selectedStartsAt, onSelect }: SlotListProps) {
     return new Set(firstWithFreeSlots ? [firstWithFreeSlots.key] : [])
   })
   const allExpanded =
-    groups.length > 0 && groups.every((group) => expandedDays.has(group.key))
+    groups.length > 0 &&
+    groups.every(
+      (group) => expandedDays.has(group.key) || group.key === lockedDayKey,
+    )
   const toggleAllLabel = allExpanded ? 'Свернуть все' : 'Развернуть все'
 
   return (
@@ -56,7 +60,11 @@ export function SlotList({ slots, selectedStartsAt, onSelect }: SlotListProps) {
           data-testid="slot-toggle-all"
           onClick={() =>
             setExpandedDays(
-              allExpanded ? new Set() : new Set(groups.map((group) => group.key)),
+              allExpanded
+                ? lockedDayKey
+                  ? new Set([lockedDayKey])
+                  : new Set<string>()
+                : new Set(groups.map((group) => group.key)),
             )
           }
           size="sm"
@@ -67,7 +75,7 @@ export function SlotList({ slots, selectedStartsAt, onSelect }: SlotListProps) {
         </Button>
       </div>
       {groups.map((group) => {
-        const isExpanded = expandedDays.has(group.key)
+        const isExpanded = expandedDays.has(group.key) || group.key === lockedDayKey
         const panelId = `slot-day-panel-${group.key}`
 
         return (
@@ -87,6 +95,7 @@ export function SlotList({ slots, selectedStartsAt, onSelect }: SlotListProps) {
                 className="flex w-full items-center justify-between gap-2 rounded-md text-left hover:underline"
                 onClick={() =>
                   setExpandedDays((current) => {
+                    if (group.key === lockedDayKey) return current
                     const next = new Set(current)
                     if (next.has(group.key)) {
                       next.delete(group.key)
