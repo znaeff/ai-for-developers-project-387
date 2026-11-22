@@ -292,7 +292,8 @@ jobs:
               {"body": "<общий комментарий>", "comments": [{"path": "<файл>", "line": <строка>, "side": "RIGHT", "body": "<замечание>"}]}
             - JSON должен содержать поля body, comments, path, line, side. Пустой comments допустим только если замечаний действительно нет.
         run: |
-          opencode run --dir "$RUNNER_TEMP/review" --model "$MODEL" --agent reviewer --auto --format json "$PROMPT" > "$RUNNER_TEMP/review/.review/out.jsonl"
+          cd "$RUNNER_TEMP/review"
+          opencode run --model "$MODEL" --agent reviewer --auto --format json "$PROMPT" > .review/out.jsonl
 
       - name: Publish the review
         if: steps.limit.outputs.decision == 'allow'
