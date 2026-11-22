@@ -16,9 +16,7 @@ jobs:
   opencode:
     if: >-
       github.event.comment.user.type != 'Bot' &&
-      (github.event.comment.author_association == 'OWNER' ||
-       github.event.comment.author_association == 'MEMBER' ||
-       github.event.comment.author_association == 'COLLABORATOR') &&
+      github.event.comment.author_association == 'OWNER' &&
       (startsWith(github.event.comment.body, '/oc') ||
        startsWith(github.event.comment.body, '/opencode'))
     runs-on: ubuntu-latest
@@ -26,6 +24,9 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0

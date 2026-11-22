@@ -154,7 +154,9 @@ Playwright сам поднимает бэкенд на 3000 (с `E2E_RESET=1`) �
 
 В репозитории настроен официальный GitHub App `opencode-agent`; альтернативный агент с теми же сценариями не используется, поэтому отдельного сравнения в этом README нет.
 
-Workflow `.github/workflows/opencode.yml` запускается на события `issue_comment` и `pull_request_review_comment` типа `created`. Команда должна быть в начале комментария; обрабатываются `/oc` и `/opencode` (явно задано через `mentions`). Запуск разрешён только доверенным участникам (`OWNER`, `MEMBER`, `COLLABORATOR`); комментарии ботов и недоверенных fork игнорируются. Права ограничены: `contents: read` и `id-token: write`, checkout выполняется с `persist-credentials: false`; авторизация — через OIDC GitHub App, ключ модели лежит в GitHub Secrets как `OPENCODE_API_KEY` (значение в репозитории не хранится).
+Workflow `.github/workflows/opencode.yml` запускается на события `issue_comment` и `pull_request_review_comment` типа `created`. Команда должна быть в начале комментария; обрабатываются `/oc` и `/opencode` (явно задано через `mentions`). Запуск разрешён только владельцу репозитория (`author_association == 'OWNER'`); для этого персонального репозитория это майнтейнер. Комментарии ботов и недоверенных fork игнорируются.
+
+Права job ограничены: `contents: read`, `id-token: write` и `issues: write`; checkout выполняется с `persist-credentials: false`. Авторизация action — через OIDC GitHub App `opencode-agent`. Внутри сессии `gh` получает короткоживущий `GH_TOKEN` из автоматического `GITHUB_TOKEN` с правом `issues: write` — это не новый секрет; он нужен скиллам вроде `to-spec`, чтобы публиковать issue. Ключ модели лежит в GitHub Secrets как `OPENCODE_API_KEY`, его значение в репозитории не хранится и не выводится.
 
 Используется модель `opencode/glm-5.3` через OpenCode Console. Назначение воркфлоу — отвечать на команды в issue и pull request: объяснять код, документацию и Issue, а при задачах на изменения — готовить правки. Результат публикуется комментарием в соответствующем треде; прогон виден во вкладке Actions (`workflow: opencode`).
 
