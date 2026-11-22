@@ -158,7 +158,7 @@ Workflow `.github/workflows/opencode.yml` запускается на событ
 
 Права job ограничены: `contents: read`, `id-token: write` и `issues: write`; checkout выполняется с `persist-credentials: false`. Авторизация action — через OIDC GitHub App `opencode-agent`. Внутри сессии `gh` получает короткоживущий `GH_TOKEN` из автоматического `GITHUB_TOKEN` с правом `issues: write` — это не новый секрет; он нужен скиллам вроде `to-spec`, чтобы публиковать issue. Ключ модели лежит в GitHub Secrets как `OPENCODE_API_KEY`, его значение в репозитории не хранится и не выводится.
 
-Используется модель `opencode/glm-5.3` через OpenCode Console. Назначение воркфлоу — отвечать на команды в issue и pull request: объяснять код, документацию и Issue, а при задачах на изменения — готовить правки. Результат публикуется комментарием в соответствующем треде; прогон виден во вкладке Actions (`workflow: opencode`).
+Используется модель `opencode/big-pickle` через OpenCode Console. Назначение воркфлоу — отвечать на команды в issue и pull request: объяснять код, документацию и Issue, а при задачах на изменения — готовить правки. Результат публикуется комментарием в соответствующем треде; прогон виден во вкладке Actions (`workflow: opencode`).
 
 Явно принятое решение по `share`: `share: "false"`. Сессии агента автоматически не публикуются; ссылки на каждый прогон и ответ добавляются в issue/PR вручную.
 
