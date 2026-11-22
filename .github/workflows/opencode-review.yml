@@ -109,6 +109,7 @@ jobs:
           set -euo pipefail
           status=pending
           for attempt in $(seq 1 30); do
+            echo "Waiting for the required check (attempt $attempt/30)"
             gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/check-runs?per_page=100" > .review/checks.json 2>/dev/null || echo '{}' > .review/checks.json
             # Wait only for the required `check` context. The commit's check-runs
             # also include this workflow's own `review` run (in progress for the
@@ -186,7 +187,7 @@ jobs:
           set -euo pipefail
           reason=$(jq -r .reason .review/limit.json 2>/dev/null || echo limit-reached)
           attempts=$(jq -r '"\(.count)/\(.limit)"' .review/limit.json 2>/dev/null || echo '>5/5')
-          body=$(printf 'limit-reached: лимит авторевью на этот PR исчерпан (причина: `%s`, попытки: %s).\n\nHead SHA: `%s`\nЛог запуска: %s\n\nРевью этого SHA не выполнялось; нужно явное решение человека о мерже.' "$reason" "$attempts" "$HEAD_SHA" "$RUN_URL")
+          body=$(printf 'limit-reached: лимит авторевью на этот PR исчерпан (причина: %s, попытки: %s).\n\nHead SHA: %s\nЛог запуска: %s\n\nРевью этого SHA не выполнялось; нужно явное решение человека о мерже.' "$reason" "$attempts" "$HEAD_SHA" "$RUN_URL")
           gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -f body="$body" > /dev/null
 
       - name: Publish the error status comment
@@ -200,7 +201,7 @@ jobs:
         run: |
           set -euo pipefail
           decision="${DECISION:-error}"
-          body=$(printf 'error: авторевью не запускалось из-за ошибки подготовки или GitHub API (`%s`).\n\nHead SHA: `%s`\nЛог запуска: %s\n\nОтсутствие отчёта не означает отсутствие замечаний.' "$decision" "$HEAD_SHA" "$RUN_URL")
+          body=$(printf 'error: авторевью не запускалось из-за ошибки подготовки или GitHub API (%s).\n\nHead SHA: %s\nЛог запуска: %s\n\nОтсутствие отчёта не означает отсутствие замечаний.' "$decision" "$HEAD_SHA" "$RUN_URL")
           gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -f body="$body" > /dev/null
 
       - name: Stage the isolated review workspace
@@ -292,6 +293,7 @@ jobs:
               {"body": "<общий комментарий>", "comments": [{"path": "<файл>", "line": <строка>, "side": "RIGHT", "body": "<замечание>"}]}
             - JSON должен содержать поля body, comments, path, line, side. Пустой comments допустим только если замечаний действительно нет.
         run: |
+          set -euo pipefail
           cd "$RUNNER_TEMP/review"
           opencode run --model "$MODEL" --agent reviewer --auto --format json "$PROMPT" > .review/out.jsonl
 
@@ -339,5 +341,5 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
-          body=$(printf 'error: авторевью не опубликовало отчёт (`%s`).\n\nHead SHA: `%s`\nЛог запуска: %s\n\nОтсутствие отчёта не означает отсутствие замечаний.' "${{ job.status }}" "$HEAD_SHA" "$RUN_URL")
+          body=$(printf 'error: авторевью не опубликовало отчёт (%s).\n\nHead SHA: %s\nЛог запуска: %s\n\nОтсутствие отчёта не означает отсутствие замечаний.' "${{ job.status }}" "$HEAD_SHA" "$RUN_URL")
           gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -f body="$body" > /dev/null

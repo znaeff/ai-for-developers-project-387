@@ -2,7 +2,7 @@
 
 ## Toolchain
 
-- `mise.toml` pins **Node 22**, **pnpm 12.18.0** and **jactionlint 2.6.0**. Run `mise install` first and use `mise exec -- <cmd>` (or a `mise run` task); a globally installed pnpm/Node may differ.
+- `mise.toml` pins **Node 22**, **pnpm 12.18.0**, **jactionlint 2.6.0** and **shellcheck 0.10.0**. Run `mise install` first and use `mise exec -- <cmd>` (or a `mise run` task); a globally installed pnpm/Node may differ.
 - The verification gate is `mise run check`: `mise run check:workflows` → `pnpm generate:check` → `pnpm lint` → `pnpm typecheck` → `pnpm test:scripts` → `pnpm test` → `pnpm test:e2e` → `pnpm docker:build` → `pnpm docker:smoke`, strictly in that order (`mise.toml`). `check:workflows` runs `jactionlint .github/workflows/*.yml` with config in `.github/jactionlint.yaml`. Run the full check before finishing a change; CI runs the same command after `pnpm install --frozen-lockfile` and Playwright browser installation. The full check requires a running Docker daemon. Use `mise run check:fast` for the subset without generation, e2e and Docker.
 - Focused checks: `mise exec -- pnpm --filter @app/backend test -- src/app.test.ts`, `mise exec -- pnpm --filter @app/backend typecheck`, `mise exec -- pnpm --filter @app/frontend typecheck`.
 
