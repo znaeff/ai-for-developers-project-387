@@ -186,6 +186,14 @@ Checkout выполняется по точному `head.sha`, а не по mer
 
 Шаблон `.github/pull_request_template.md` требует указать проверки с кодом выхода и SHA, риск `R0–R3`, способ отката, разбор замечаний и человеческое решение о merge. Полные критерии и формат замечаний — в `REVIEW.md`.
 
+### Release Please
+
+Workflow `.github/workflows/release-please.yml` запускается на push в `main` и вручную через `workflow_dispatch`. Он создаёт release PR из Conventional Commits и обновляет `CHANGELOG.md`, `package.json` и `.release-please-manifest.json`.
+
+Репозиторий не разрешает `GITHUB_TOKEN` создавать pull request, поэтому action получает fine-grained PAT из секрета `RELEASE_PLEASE_TOKEN`. PAT должен иметь доступ только к этому репозиторию и права `Contents: Read and write`, `Issues: Read and write`, `Pull requests: Read and write`; `Metadata: Read` выдаётся автоматически. Значение секрета в репозитории не хранится и не выводится в логи. При истечении или отзыве PAT release-please перестанет создавать PR, поэтому токен нужно ротировать заранее.
+
+Включать настройку `Allow GitHub Actions to create and approve pull requests` не требуется. Для ручной проверки после изменения workflow используйте `gh workflow run release-please.yml --repo znaeff/ai-for-developers-project-387 --ref main`; release PR проходит обычный CI и мержится человеком.
+
 ## Использование
 
 ```bash
