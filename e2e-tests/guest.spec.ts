@@ -488,3 +488,219 @@ test('guest sees validation errors in the booking form', async ({ page }) => {
   await expect(page.getByRole('alert')).toContainText('Почта')
 })
 
+test('guest keeps the selected slot day expanded while the booking form is open', async ({
+  page,
+  request,
+}) => {
+  const { id, title } = await createMeetingTypeViaApi(request)
+  const slots = await listSlots(request, id)
+  const freeSlot = slots.find((slot) => slot.isAvailable)
+  if (!freeSlot) throw new Error('No free slots left')
+  const date = freeSlot.startsAt.slice(0, 10)
+
+  await page.goto('/guest')
+  await page.getByRole('button', { name: new RegExp(title) }).click()
+  await expect(page.getByRole('heading', { name: 'Свободные слоты' })).toBeVisible()
+
+  const day = dayByDate(page, date)
+  const slot = day.getByTestId('slot').first()
+  await slot.click()
+  await expect(page.getByRole('heading', { name: 'Данные гостя' })).toBeVisible()
+  await expect(day.getByRole('button', { expanded: true })).toBeVisible()
+
+  await day.getByRole('button', { expanded: true }).click()
+
+  await expect(day.getByRole('button', { expanded: true })).toBeVisible()
+  await expect(slot).toBeVisible()
+})
+
+test('guest collapses every other day while the selected slot day stays open', async ({
+  page,
+  request,
+}) => {
+  const { id, title } = await createMeetingTypeViaApi(request)
+  const slots = await listSlots(request, id)
+  const freeSlot = slots.find((slot) => slot.isAvailable)
+  if (!freeSlot) throw new Error('No free slots left')
+  const date = freeSlot.startsAt.slice(0, 10)
+  const otherDates = [
+    ...new Set(slots.map((slot) => slot.startsAt.slice(0, 10))),
+  ].filter((item) => item !== date)
+  if (otherDates.length === 0) throw new Error('Expected at least two days')
+
+  await page.goto('/guest')
+  await page.getByRole('button', { name: new RegExp(title) }).click()
+  await expect(page.getByRole('heading', { name: 'Свободные слоты' })).toBeVisible()
+
+  const day = dayByDate(page, date)
+  await day.getByTestId('slot').first().click()
+  await expect(page.getByRole('heading', { name: 'Данные гостя' })).toBeVisible()
+
+  const toggleAll = page.getByTestId('slot-toggle-all')
+  await toggleAll.click()
+  await expect(toggleAll).toHaveText('Свернуть все')
+  await toggleAll.click()
+
+  await expect(day.getByRole('button', { expanded: true })).toBeVisible()
+  await expect(day.getByTestId('slot').first()).toBeVisible()
+  for (const otherDate of otherDates) {
+    const otherDay = dayByDate(page, otherDate)
+    await expect(otherDay.getByRole('button', { expanded: false })).toBeVisible()
+    await expect(otherDay.getByTestId('slot')).toHaveCount(0)
+  }
+})
+
+test('guest can collapse a former selected day after cancelling the booking', async ({
+  page,
+  request,
+}) => {
+  const { id, title } = await createMeetingTypeViaApi(request)
+  const slots = await listSlots(request, id)
+  const freeSlot = slots.find((slot) => slot.isAvailable)
+  if (!freeSlot) throw new Error('No free slots left')
+  const date = freeSlot.startsAt.slice(0, 10)
+
+  await page.goto('/guest')
+  await page.getByRole('button', { name: new RegExp(title) }).click()
+  await expect(page.getByRole('heading', { name: 'Свободные слоты' })).toBeVisible()
+
+  const day = dayByDate(page, date)
+  await day.getByTestId('slot').first().click()
+  await expect(page.getByRole('heading', { name: 'Данные гостя' })).toBeVisible()
+
+  const toggleAll = page.getByTestId('slot-toggle-all')
+  await toggleAll.click()
+  await toggleAll.click()
+  await expect(day.getByRole('button', { expanded: true })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Отменить' }).click()
+
+  await expect(page.getByRole('heading', { name: 'Данные гостя' })).toHaveCount(0)
+  await expect(day.getByRole('button', { expanded: true })).toBeVisible()
+
+  await day.getByRole('button', { expanded: true }).click()
+
+  await expect(day.getByRole('button', { expanded: false })).toBeVisible()
+  await expect(day.getByTestId('slot')).toHaveCount(0)
+})
+
+test('guest moves the locked day when choosing another slot', async ({
+  page,
+  request,
+}) => {
+  const { id, title } = await createMeetingTypeViaApi(request)
+  const slots = await listSlots(request, id)
+  const firstDate = slots.find((slot) => slot.isAvailable)?.startsAt.slice(0, 10)
+  const secondDate = slots
+    .find((slot) => slot.isAvailable && !slot.startsAt.startsWith(firstDate ?? ''))
+    ?.startsAt.slice(0, 10)
+  if (!firstDate || !secondDate) throw new Error('Expected free slots on two days')
+
+  await page.goto('/guest')
+  await page.getByRole('button', { name: new RegExp(title) }).click()
+  await expect(page.getByRole('heading', { name: 'Свободные слоты' })).toBeVisible()
+
+  const firstDay = dayByDate(page, firstDate)
+  const secondDay = dayByDate(page, secondDate)
+  await firstDay.getByTestId('slot').first().click()
+  await expect(page.getByRole('heading', { name: 'Данные гостя' })).toBeVisible()
+  await expect(firstDay.getByRole('button', { expanded: true })).toBeVisible()
+
+  await secondDay.getByRole('button', { expanded: false }).click()
+  await secondDay.getByTestId('slot').first().click()
+  await expect(page.getByRole('heading', { name: 'Данные гостя' })).toBeVisible()
+  await expect(secondDay.getByTestId('slot').first()).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+
+  await firstDay.getByRole('button', { expanded: true }).click()
+
+  await expect(firstDay.getByRole('button', { expanded: false })).toBeVisible()
+  await expect(secondDay.getByRole('button', { expanded: true })).toBeVisible()
+  await secondDay.getByRole('button', { expanded: true }).click()
+  await expect(secondDay.getByRole('button', { expanded: true })).toBeVisible()
+})
+
+test('guest sees the default day expansion again after booking a slot', async ({
+  page,
+  request,
+}) => {
+  const { id, title } = await createMeetingTypeViaApi(request)
+  const slots = await listSlots(request, id)
+  const firstDate = slots.find((slot) => slot.isAvailable)?.startsAt.slice(0, 10)
+  if (!firstDate) throw new Error('No free slots left')
+  const otherDates = [
+    ...new Set(slots.map((slot) => slot.startsAt.slice(0, 10))),
+  ].filter((item) => item !== firstDate)
+  if (otherDates.length === 0) throw new Error('Expected at least two days')
+
+  await page.goto('/guest')
+  await page.getByRole('button', { name: new RegExp(title) }).click()
+  await expect(page.getByRole('heading', { name: 'Свободные слоты' })).toBeVisible()
+
+  await page.getByTestId('slot-toggle-all').click()
+  await expect(page.getByTestId('slot-toggle-all')).toHaveText('Свернуть все')
+
+  const firstDay = dayByDate(page, firstDate)
+  await firstDay.getByTestId('slot').first().click()
+  await page.getByLabel('Имя').fill('Анна')
+  await page.getByLabel('Почта').fill('anna@example.com')
+  await page.getByRole('button', { name: 'Забронировать' }).click()
+
+  await expect(page.getByTestId('booking-confirmation')).toBeVisible()
+  await expect(firstDay.getByRole('button', { expanded: true })).toBeVisible()
+  for (const otherDate of otherDates) {
+    const otherDay = dayByDate(page, otherDate)
+    await expect(otherDay.getByRole('button', { expanded: false })).toBeVisible()
+    await expect(otherDay.getByTestId('slot')).toHaveCount(0)
+  }
+})
+
+test('guest sees the default day expansion again after a booking conflict', async ({
+  page,
+  request,
+}) => {
+  const { id, title } = await createMeetingTypeViaApi(request)
+  const slots = await listSlots(request, id)
+  const startsAt = slots.find((slot) => slot.isAvailable)?.startsAt
+  if (!startsAt) throw new Error('No free slots left')
+  const firstDate = startsAt.slice(0, 10)
+  const otherDates = [
+    ...new Set(slots.map((slot) => slot.startsAt.slice(0, 10))),
+  ].filter((item) => item !== firstDate)
+  if (otherDates.length === 0) throw new Error('Expected at least two days')
+
+  await page.goto('/guest')
+  await page.getByRole('button', { name: new RegExp(title) }).click()
+  await expect(page.getByRole('heading', { name: 'Свободные слоты' })).toBeVisible()
+
+  await page.getByTestId('slot-toggle-all').click()
+  await expect(page.getByTestId('slot-toggle-all')).toHaveText('Свернуть все')
+
+  const firstDay = dayByDate(page, firstDate)
+  await firstDay.getByTestId('slot').first().click()
+
+  const taken = await request.post('/api/bookings', {
+    data: {
+      meetingTypeId: id,
+      startsAt,
+      guestName: 'Другой гость',
+      guestEmail: 'other@example.com',
+    },
+  })
+  expect(taken.status()).toBe(201)
+
+  await page.getByLabel('Имя').fill('Анна')
+  await page.getByLabel('Почта').fill('anna@example.com')
+  await page.getByRole('button', { name: 'Забронировать' }).click()
+
+  await expect(page.getByRole('alert')).toContainText('уже занят')
+  await expect(firstDay.getByRole('button', { expanded: true })).toBeVisible()
+  for (const otherDate of otherDates) {
+    const otherDay = dayByDate(page, otherDate)
+    await expect(otherDay.getByRole('button', { expanded: false })).toBeVisible()
+    await expect(otherDay.getByTestId('slot')).toHaveCount(0)
+  }
+})
+
