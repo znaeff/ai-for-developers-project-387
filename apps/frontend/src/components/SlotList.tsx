@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { Slot } from '@/lib/api'
 import { formatMoscowDay, formatMoscowTime, moscowDayKey } from '@/lib/format'
 
@@ -36,54 +37,87 @@ type SlotListProps = {
 
 export function SlotList({ slots, selectedStartsAt, onSelect }: SlotListProps) {
   const groups = groupSlots(slots)
+  const [expandedDays, setExpandedDays] = useState<Set<string>>(() => {
+    const firstWithFreeSlots = groups.find((group) =>
+      group.slots.some((slot) => slot.isAvailable),
+    )
+    return new Set(firstWithFreeSlots ? [firstWithFreeSlots.key] : [])
+  })
 
   return (
     <div className="space-y-6" data-testid="slot-list">
-      {groups.map((group) => (
-        <section
-          aria-labelledby={`slot-day-${group.key}`}
-          data-testid="slot-day"
-          key={group.key}
-        >
-          <h3
-            className="mb-2 text-sm font-semibold"
-            id={`slot-day-${group.key}`}
-          >
-            {group.label}
-          </h3>
-          <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {group.slots.map((slot) => {
-              const isSelected = selectedStartsAt === slot.startsAt
-              const isUnavailable = !slot.isAvailable
-              const label = `${formatMoscowTime(slot.startsAt)}–${formatMoscowTime(slot.endsAt)}`
+      {groups.map((group) => {
+        const isExpanded = expandedDays.has(group.key)
+        const panelId = `slot-day-panel-${group.key}`
 
-              return (
-                <li key={slot.startsAt}>
-                  <button
-                    aria-label={`${label}${isUnavailable ? ', занято' : ''}`}
-                    aria-pressed={isSelected}
-                    className={[
-                      'w-full rounded-md border px-2 py-1.5 text-center text-sm tabular-nums transition-colors',
-                      isUnavailable
-                        ? 'cursor-not-allowed border-border bg-muted text-muted-foreground opacity-60'
-                        : isSelected
-                          ? 'border-primary bg-primary text-primary-foreground'
-                          : 'border-border hover:bg-muted',
-                    ].join(' ')}
-                    data-available={slot.isAvailable}
-                    data-testid="slot"
-                    disabled={isUnavailable}
-                    onClick={() => onSelect(slot)}
-                    type="button"
-                  >
-                    {label}
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-        </section>
-      ))}
+        return (
+          <section
+            aria-labelledby={`slot-day-${group.key}`}
+            data-date={group.key}
+            data-testid="slot-day"
+            key={group.key}
+          >
+            <h3
+              className="mb-2 text-sm font-semibold"
+              id={`slot-day-${group.key}`}
+            >
+              <button
+                aria-controls={panelId}
+                aria-expanded={isExpanded}
+                className="flex w-full items-center justify-between gap-2 rounded-md text-left hover:underline"
+                onClick={() =>
+                  setExpandedDays((current) => {
+                    const next = new Set(current)
+                    if (next.has(group.key)) {
+                      next.delete(group.key)
+                    } else {
+                      next.add(group.key)
+                    }
+                    return next
+                  })
+                }
+                type="button"
+              >
+                {group.label}
+                <span aria-hidden="true">{isExpanded ? '−' : '+'}</span>
+              </button>
+            </h3>
+            {isExpanded ? (
+              <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4" id={panelId}>
+                {group.slots.map((slot) => {
+                  const isSelected = selectedStartsAt === slot.startsAt
+                  const isUnavailable = !slot.isAvailable
+                  const label = `${formatMoscowTime(slot.startsAt)}–${formatMoscowTime(slot.endsAt)}`
+
+                  return (
+                    <li key={slot.startsAt}>
+                      <button
+                        aria-label={`${label}${isUnavailable ? ', занято' : ''}`}
+                        aria-pressed={isSelected}
+                        className={[
+                          'w-full rounded-md border px-2 py-1.5 text-center text-sm tabular-nums transition-colors',
+                          isUnavailable
+                            ? 'cursor-not-allowed border-border bg-muted text-muted-foreground opacity-60'
+                            : isSelected
+                              ? 'border-primary bg-primary text-primary-foreground'
+                              : 'border-border hover:bg-muted',
+                        ].join(' ')}
+                        data-available={slot.isAvailable}
+                        data-testid="slot"
+                        disabled={isUnavailable}
+                        onClick={() => onSelect(slot)}
+                        type="button"
+                      >
+                        {label}
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            ) : null}
+          </section>
+        )
+      })}
     </div>
   )
 }
