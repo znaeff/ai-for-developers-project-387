@@ -45,12 +45,35 @@ export function SlotList({ slots, selectedStartsAt, onSelect }: SlotListProps) {
     )
     return new Set(firstWithFreeSlots ? [firstWithFreeSlots.key] : [])
   })
+
+  function isDayExpanded(key: string) {
+    return expandedDays.has(key) || key === lockedDayKey
+  }
+
+  function toggleDay(key: string) {
+    setExpandedDays((current) => {
+      if (key === lockedDayKey) return current
+      const next = new Set(current)
+      if (next.has(key)) {
+        next.delete(key)
+      } else {
+        next.add(key)
+      }
+      return next
+    })
+  }
+
   const allExpanded =
-    groups.length > 0 &&
-    groups.every(
-      (group) => expandedDays.has(group.key) || group.key === lockedDayKey,
-    )
+    groups.length > 0 && groups.every((group) => isDayExpanded(group.key))
   const toggleAllLabel = allExpanded ? 'Свернуть все' : 'Развернуть все'
+
+  function toggleAllDays() {
+    if (allExpanded) {
+      setExpandedDays(lockedDayKey ? new Set([lockedDayKey]) : new Set<string>())
+    } else {
+      setExpandedDays(new Set(groups.map((group) => group.key)))
+    }
+  }
 
   return (
     <div className="space-y-6" data-testid="slot-list">
@@ -58,15 +81,7 @@ export function SlotList({ slots, selectedStartsAt, onSelect }: SlotListProps) {
         <Button
           aria-label={toggleAllLabel}
           data-testid="slot-toggle-all"
-          onClick={() =>
-            setExpandedDays(
-              allExpanded
-                ? lockedDayKey
-                  ? new Set([lockedDayKey])
-                  : new Set<string>()
-                : new Set(groups.map((group) => group.key)),
-            )
-          }
+          onClick={toggleAllDays}
           size="sm"
           type="button"
           variant="outline"
@@ -75,7 +90,7 @@ export function SlotList({ slots, selectedStartsAt, onSelect }: SlotListProps) {
         </Button>
       </div>
       {groups.map((group) => {
-        const isExpanded = expandedDays.has(group.key) || group.key === lockedDayKey
+        const isExpanded = isDayExpanded(group.key)
         const panelId = `slot-day-panel-${group.key}`
 
         return (
@@ -93,18 +108,7 @@ export function SlotList({ slots, selectedStartsAt, onSelect }: SlotListProps) {
                 aria-controls={panelId}
                 aria-expanded={isExpanded}
                 className="flex w-full items-center justify-between gap-2 rounded-md text-left hover:underline"
-                onClick={() =>
-                  setExpandedDays((current) => {
-                    if (group.key === lockedDayKey) return current
-                    const next = new Set(current)
-                    if (next.has(group.key)) {
-                      next.delete(group.key)
-                    } else {
-                      next.add(group.key)
-                    }
-                    return next
-                  })
-                }
+                onClick={() => toggleDay(group.key)}
                 type="button"
               >
                 {group.label}

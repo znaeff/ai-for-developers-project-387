@@ -15,6 +15,21 @@ function dayByDate(page: Page, date: string) {
   return page.locator(`[data-testid="slot-day"][data-date="${date}"]`)
 }
 
+function dayKey(startsAt: string) {
+  return startsAt.slice(0, 10)
+}
+
+function dayKeys(slots: SlotResponse[]) {
+  return [...new Set(slots.map((slot) => dayKey(slot.startsAt)))]
+}
+
+function requireTwoDates(slots: SlotResponse[]) {
+  const dates = dayKeys(slots)
+  if (dates.length < 2) throw new Error('Expected at least two days')
+
+  return dates
+}
+
 async function expandDayIfCollapsed(page: Page, date: string) {
   const header = dayByDate(page, date).getByRole('button', { expanded: false })
   if (await header.count()) await header.click()
@@ -47,6 +62,18 @@ async function listSlots(request: APIRequestContext, meetingTypeId: string) {
   return (await response.json()) as SlotResponse[]
 }
 
+async function findMeetingTypeByTitle(request: APIRequestContext, title: string) {
+  const response = await request.get('/api/meeting-types')
+  const meetingTypes = (await response.json()) as Array<{
+    id: string
+    title: string
+  }>
+  const meetingType = meetingTypes.find((item) => item.title === title)
+  if (!meetingType) throw new Error(`Meeting type ${title} was not created`)
+
+  return meetingType
+}
+
 async function bookAllAvailableInDay(
   request: APIRequestContext,
   meetingTypeId: string,
@@ -73,6 +100,41 @@ async function bookAllAvailableInDay(
   throw new Error('Too many slots to book')
 }
 
+async function selectMeetingType(page: Page, title: string) {
+  await page.getByRole('button', { name: new RegExp(title) }).click()
+  await expect(page.getByRole('heading', { name: 'Свободные слоты' })).toBeVisible()
+}
+
+async function takeSlotViaApi(
+  request: APIRequestContext,
+  meetingTypeId: string,
+  startsAt: string,
+) {
+  const taken = await request.post('/api/bookings', {
+    data: {
+      meetingTypeId,
+      startsAt,
+      guestName: 'Другой гость',
+      guestEmail: 'other@example.com',
+    },
+  })
+  expect(taken.status()).toBe(201)
+}
+
+async function openMeetingType(page: Page, title: string) {
+  await page.goto('/guest')
+  await selectMeetingType(page, title)
+}
+
+const GUEST_NAME = 'Анна'
+const GUEST_EMAIL = 'anna@example.com'
+
+async function submitBookingForm(page: Page) {
+  await page.getByLabel('Имя').fill(GUEST_NAME)
+  await page.getByLabel('Почта').fill(GUEST_EMAIL)
+  await page.getByRole('button', { name: 'Забронировать' }).click()
+}
+
 async function createMeetingType(
   page: Page,
   input: { title: string; description: string; durationMinutes: string },
@@ -92,18 +154,18 @@ test('guest sees only the nearest day with free slots expanded', async ({
 }) => {
   const { id, title } = await createMeetingTypeViaApi(request)
   const initialSlots = await listSlots(request, id)
-  const firstDate = initialSlots[0]?.startsAt.slice(0, 10)
+  const firstSlot = initialSlots[0]
+  const firstDate = firstSlot ? dayKey(firstSlot.startsAt) : undefined
   if (!firstDate) throw new Error('No slots returned')
 
   await bookAllAvailableInDay(request, id, firstDate)
 
   const remainingSlots = await listSlots(request, id)
-  const nextDate = remainingSlots.find((slot) => slot.isAvailable)?.startsAt.slice(0, 10)
+  const nextStartsAt = remainingSlots.find((slot) => slot.isAvailable)?.startsAt
+  const nextDate = nextStartsAt ? dayKey(nextStartsAt) : undefined
   if (!nextDate) throw new Error('No free slots left')
 
-  await page.goto('/guest')
-  await page.getByRole('button', { name: new RegExp(title) }).click()
-  await expect(page.getByRole('heading', { name: 'Свободные слоты' })).toBeVisible()
+  await openMeetingType(page, title)
 
   const firstDay = dayByDate(page, firstDate)
   const nextDay = dayByDate(page, nextDate)
@@ -119,13 +181,10 @@ test('guest expands and collapses days independently', async ({
 }) => {
   const { id, title } = await createMeetingTypeViaApi(request)
   const slots = await listSlots(request, id)
-  const dates = [...new Set(slots.map((slot) => slot.startsAt.slice(0, 10)))]
-  if (dates.length < 2) throw new Error('Expected at least two days')
+  const dates = requireTwoDates(slots)
   const [firstDate, secondDate] = dates
 
-  await page.goto('/guest')
-  await page.getByRole('button', { name: new RegExp(title) }).click()
-  await expect(page.getByRole('heading', { name: 'Свободные слоты' })).toBeVisible()
+  await openMeetingType(page, title)
 
   const firstDay = dayByDate(page, firstDate)
   const secondDay = dayByDate(page, secondDate)
@@ -149,12 +208,9 @@ test('guest expands all days at once from the default compact list', async ({
 }) => {
   const { id, title } = await createMeetingTypeViaApi(request)
   const slots = await listSlots(request, id)
-  const dates = [...new Set(slots.map((slot) => slot.startsAt.slice(0, 10)))]
-  if (dates.length < 2) throw new Error('Expected at least two days')
+  const dates = requireTwoDates(slots)
 
-  await page.goto('/guest')
-  await page.getByRole('button', { name: new RegExp(title) }).click()
-  await expect(page.getByRole('heading', { name: 'Свободные слоты' })).toBeVisible()
+  await openMeetingType(page, title)
 
   const toggleAll = page.getByTestId('slot-toggle-all')
   await expect(toggleAll).toHaveText('Развернуть все')
@@ -177,12 +233,9 @@ test('guest collapses all days at once and can expand them again', async ({
 }) => {
   const { id, title } = await createMeetingTypeViaApi(request)
   const slots = await listSlots(request, id)
-  const dates = [...new Set(slots.map((slot) => slot.startsAt.slice(0, 10)))]
-  if (dates.length < 2) throw new Error('Expected at least two days')
+  const dates = requireTwoDates(slots)
 
-  await page.goto('/guest')
-  await page.getByRole('button', { name: new RegExp(title) }).click()
-  await expect(page.getByRole('heading', { name: 'Свободные слоты' })).toBeVisible()
+  await openMeetingType(page, title)
 
   const toggleAll = page.getByTestId('slot-toggle-all')
   await toggleAll.click()
@@ -215,13 +268,10 @@ test('guest sees the default day expansion again after reloading slots', async (
 }) => {
   const { id, title } = await createMeetingTypeViaApi(request)
   const slots = await listSlots(request, id)
-  const dates = [...new Set(slots.map((slot) => slot.startsAt.slice(0, 10)))]
-  if (dates.length < 2) throw new Error('Expected at least two days')
+  const dates = requireTwoDates(slots)
   const [firstDate, secondDate] = dates
 
-  await page.goto('/guest')
-  await page.getByRole('button', { name: new RegExp(title) }).click()
-  await expect(page.getByRole('heading', { name: 'Свободные слоты' })).toBeVisible()
+  await openMeetingType(page, title)
 
   const firstDay = dayByDate(page, firstDate)
   const secondDay = dayByDate(page, secondDate)
@@ -231,7 +281,7 @@ test('guest sees the default day expansion again after reloading slots', async (
   await expect(secondDay.getByRole('button', { expanded: true })).toBeVisible()
 
   await page.getByRole('button', { name: 'Выбрать другой тип' }).click()
-  await page.getByRole('button', { name: new RegExp(title) }).click()
+  await selectMeetingType(page, title)
   await expect(firstDay.getByRole('button', { expanded: true })).toBeVisible()
   await expect(secondDay.getByRole('button', { expanded: false })).toBeVisible()
   await expect(firstDay.getByTestId('slot').first()).toBeVisible()
@@ -250,23 +300,15 @@ test('guest selects a meeting type and sees slots grouped by days', async ({
     durationMinutes: '30',
   })
 
-  const meetingTypesResponse = await request.get('/api/meeting-types')
-  const meetingTypes = (await meetingTypesResponse.json()) as Array<{
-    id: string
-    title: string
-  }>
-  const meetingType = meetingTypes.find((item) => item.title === title)
-  if (!meetingType) throw new Error(`Meeting type ${title} was not created`)
+  const meetingType = await findMeetingTypeByTitle(request, title)
   const slots = await listSlots(request, meetingType.id)
-  const firstDate = slots[0]?.startsAt.slice(0, 10)
+  const firstDate = slots[0] ? dayKey(slots[0].startsAt) : undefined
   if (!firstDate) throw new Error('No slots returned')
 
   await page.goto('/guest')
   await expect(page.getByRole('heading', { name: 'Выберите тип встречи' })).toBeVisible()
 
-  await page.getByRole('button', { name: new RegExp(title) }).click()
-
-  await expect(page.getByRole('heading', { name: 'Свободные слоты' })).toBeVisible()
+  await selectMeetingType(page, title)
 
   const days = page.getByTestId('slot-day')
   await expect(days.first()).toBeVisible()
@@ -296,25 +338,15 @@ test('guest sees an empty state when all slots are booked', async ({
     durationMinutes: '60',
   })
 
-  const typesResponse = await request.get('/api/meeting-types')
-  const meetingTypes = (await typesResponse.json()) as Array<{
-    id: string
-    title: string
-  }>
-  const meetingType = meetingTypes.find((item) => item.title === title)
-
-  if (!meetingType) {
-    throw new Error(`Meeting type ${title} was not created`)
-  }
+  const meetingType = await findMeetingTypeByTitle(request, title)
 
   let slotsResponse = await request.get(
     `/api/meeting-types/${meetingType.id}/slots`,
   )
-  let slots = ((await slotsResponse.json()) as Array<{
-    startsAt: string
-    isAvailable: boolean
-  }>).filter((slot) => slot.isAvailable)
-  const firstDate = slots[0]?.startsAt.slice(0, 10)
+  let slots = ((await slotsResponse.json()) as SlotResponse[]).filter(
+    (slot) => slot.isAvailable,
+  )
+  const firstDate = slots[0] ? dayKey(slots[0].startsAt) : undefined
   if (!firstDate) throw new Error('No slots returned')
 
   for (let attempt = 0; slots.length > 0; attempt += 1) {
@@ -335,16 +367,12 @@ test('guest sees an empty state when all slots are booked', async ({
     slotsResponse = await request.get(
       `/api/meeting-types/${meetingType.id}/slots`,
     )
-    slots = ((await slotsResponse.json()) as Array<{
-      startsAt: string
-      isAvailable: boolean
-    }>).filter((slot) => slot.isAvailable)
+    slots = ((await slotsResponse.json()) as SlotResponse[]).filter(
+      (slot) => slot.isAvailable,
+    )
   }
 
-  await page.goto('/guest')
-  await page.getByRole('button', { name: new RegExp(title) }).click()
-
-  await expect(page.getByRole('heading', { name: 'Свободные слоты' })).toBeVisible()
+  await openMeetingType(page, title)
   await expect(page.getByText('Свободных слотов нет.')).toBeVisible()
 
   const days = page.getByTestId('slot-day')
@@ -372,20 +400,12 @@ test('guest books a slot and it becomes unavailable', async ({
     durationMinutes: '30',
   })
 
-  const meetingTypesResponse = await request.get('/api/meeting-types')
-  const meetingTypes = (await meetingTypesResponse.json()) as Array<{
-    id: string
-    title: string
-  }>
-  const meetingType = meetingTypes.find((item) => item.title === title)
-  if (!meetingType) throw new Error(`Meeting type ${title} was not created`)
+  const meetingType = await findMeetingTypeByTitle(request, title)
   const slots = await listSlots(request, meetingType.id)
-  const firstDate = slots[0]?.startsAt.slice(0, 10)
+  const firstDate = slots[0] ? dayKey(slots[0].startsAt) : undefined
   if (!firstDate) throw new Error('No slots returned')
 
-  await page.goto('/guest')
-  await page.getByRole('button', { name: new RegExp(title) }).click()
-  await expect(page.getByRole('heading', { name: 'Свободные слоты' })).toBeVisible()
+  await openMeetingType(page, title)
 
   const firstDay = dayByDate(page, firstDate)
   const slot = firstDay.getByTestId('slot').first()
@@ -394,9 +414,7 @@ test('guest books a slot and it becomes unavailable', async ({
   await slot.click()
 
   await expect(page.getByRole('heading', { name: 'Данные гостя' })).toBeVisible()
-  await page.getByLabel('Имя').fill('Анна')
-  await page.getByLabel('Почта').fill('anna@example.com')
-  await page.getByRole('button', { name: 'Забронировать' }).click()
+  await submitBookingForm(page)
 
   const confirmation = page.getByTestId('booking-confirmation')
   await expect(confirmation).toBeVisible()
@@ -427,31 +445,19 @@ test('guest sees a fresh slot list when the chosen slot was taken', async ({
   const slots = await listSlots(request, meetingType.id)
   const startsAt = slots[0]?.startsAt
   expect(startsAt).toBeTruthy()
-  const firstDate = startsAt?.slice(0, 10)
+  const firstDate = startsAt ? dayKey(startsAt) : undefined
   if (!firstDate) throw new Error('No slots returned')
 
-  await page.goto('/guest')
-  await page.getByRole('button', { name: new RegExp(title) }).click()
-  await expect(page.getByRole('heading', { name: 'Свободные слоты' })).toBeVisible()
+  await openMeetingType(page, title)
 
   const firstDay = dayByDate(page, firstDate)
   const firstSlot = firstDay.getByTestId('slot').first()
   const slotLabel = (await firstSlot.innerText()).trim()
   await firstSlot.click()
 
-  const taken = await request.post('/api/bookings', {
-    data: {
-      meetingTypeId: meetingType.id,
-      startsAt,
-      guestName: 'Другой гость',
-      guestEmail: 'other@example.com',
-    },
-  })
-  expect(taken.status()).toBe(201)
+  await takeSlotViaApi(request, meetingType.id, startsAt)
 
-  await page.getByLabel('Имя').fill('Анна')
-  await page.getByLabel('Почта').fill('anna@example.com')
-  await page.getByRole('button', { name: 'Забронировать' }).click()
+  await submitBookingForm(page)
 
   await expect(page.getByRole('heading', { name: 'Данные гостя' })).toHaveCount(0)
   await expect(page.getByRole('alert')).toContainText(
@@ -474,8 +480,7 @@ test('guest sees validation errors in the booking form', async ({ page }) => {
     durationMinutes: '30',
   })
 
-  await page.goto('/guest')
-  await page.getByRole('button', { name: new RegExp(title) }).click()
+  await openMeetingType(page, title)
   await page.getByTestId('slot').first().click()
 
   await page.getByLabel('Почта').fill('anna@example.com')
@@ -496,11 +501,9 @@ test('guest keeps the selected slot day expanded while the booking form is open'
   const slots = await listSlots(request, id)
   const freeSlot = slots.find((slot) => slot.isAvailable)
   if (!freeSlot) throw new Error('No free slots left')
-  const date = freeSlot.startsAt.slice(0, 10)
+  const date = dayKey(freeSlot.startsAt)
 
-  await page.goto('/guest')
-  await page.getByRole('button', { name: new RegExp(title) }).click()
-  await expect(page.getByRole('heading', { name: 'Свободные слоты' })).toBeVisible()
+  await openMeetingType(page, title)
 
   const day = dayByDate(page, date)
   const slot = day.getByTestId('slot').first()
@@ -522,15 +525,13 @@ test('guest collapses every other day while the selected slot day stays open', a
   const slots = await listSlots(request, id)
   const freeSlot = slots.find((slot) => slot.isAvailable)
   if (!freeSlot) throw new Error('No free slots left')
-  const date = freeSlot.startsAt.slice(0, 10)
+  const date = dayKey(freeSlot.startsAt)
   const otherDates = [
-    ...new Set(slots.map((slot) => slot.startsAt.slice(0, 10))),
+    ...dayKeys(slots),
   ].filter((item) => item !== date)
   if (otherDates.length === 0) throw new Error('Expected at least two days')
 
-  await page.goto('/guest')
-  await page.getByRole('button', { name: new RegExp(title) }).click()
-  await expect(page.getByRole('heading', { name: 'Свободные слоты' })).toBeVisible()
+  await openMeetingType(page, title)
 
   const day = dayByDate(page, date)
   await day.getByTestId('slot').first().click()
@@ -558,11 +559,9 @@ test('guest can collapse a former selected day after cancelling the booking', as
   const slots = await listSlots(request, id)
   const freeSlot = slots.find((slot) => slot.isAvailable)
   if (!freeSlot) throw new Error('No free slots left')
-  const date = freeSlot.startsAt.slice(0, 10)
+  const date = dayKey(freeSlot.startsAt)
 
-  await page.goto('/guest')
-  await page.getByRole('button', { name: new RegExp(title) }).click()
-  await expect(page.getByRole('heading', { name: 'Свободные слоты' })).toBeVisible()
+  await openMeetingType(page, title)
 
   const day = dayByDate(page, date)
   await day.getByTestId('slot').first().click()
@@ -590,15 +589,15 @@ test('guest moves the locked day when choosing another slot', async ({
 }) => {
   const { id, title } = await createMeetingTypeViaApi(request)
   const slots = await listSlots(request, id)
-  const firstDate = slots.find((slot) => slot.isAvailable)?.startsAt.slice(0, 10)
-  const secondDate = slots
-    .find((slot) => slot.isAvailable && !slot.startsAt.startsWith(firstDate ?? ''))
-    ?.startsAt.slice(0, 10)
+  const firstAvailable = slots.find((slot) => slot.isAvailable)?.startsAt
+  const firstDate = firstAvailable ? dayKey(firstAvailable) : undefined
+  const secondAvailable = slots.find(
+    (slot) => slot.isAvailable && !slot.startsAt.startsWith(firstDate ?? ''),
+  )?.startsAt
+  const secondDate = secondAvailable ? dayKey(secondAvailable) : undefined
   if (!firstDate || !secondDate) throw new Error('Expected free slots on two days')
 
-  await page.goto('/guest')
-  await page.getByRole('button', { name: new RegExp(title) }).click()
-  await expect(page.getByRole('heading', { name: 'Свободные слоты' })).toBeVisible()
+  await openMeetingType(page, title)
 
   const firstDay = dayByDate(page, firstDate)
   const secondDay = dayByDate(page, secondDate)
@@ -628,25 +627,22 @@ test('guest sees the default day expansion again after booking a slot', async ({
 }) => {
   const { id, title } = await createMeetingTypeViaApi(request)
   const slots = await listSlots(request, id)
-  const firstDate = slots.find((slot) => slot.isAvailable)?.startsAt.slice(0, 10)
+  const firstAvailable = slots.find((slot) => slot.isAvailable)?.startsAt
+  const firstDate = firstAvailable ? dayKey(firstAvailable) : undefined
   if (!firstDate) throw new Error('No free slots left')
   const otherDates = [
-    ...new Set(slots.map((slot) => slot.startsAt.slice(0, 10))),
+    ...dayKeys(slots),
   ].filter((item) => item !== firstDate)
   if (otherDates.length === 0) throw new Error('Expected at least two days')
 
-  await page.goto('/guest')
-  await page.getByRole('button', { name: new RegExp(title) }).click()
-  await expect(page.getByRole('heading', { name: 'Свободные слоты' })).toBeVisible()
+  await openMeetingType(page, title)
 
   await page.getByTestId('slot-toggle-all').click()
   await expect(page.getByTestId('slot-toggle-all')).toHaveText('Свернуть все')
 
   const firstDay = dayByDate(page, firstDate)
   await firstDay.getByTestId('slot').first().click()
-  await page.getByLabel('Имя').fill('Анна')
-  await page.getByLabel('Почта').fill('anna@example.com')
-  await page.getByRole('button', { name: 'Забронировать' }).click()
+  await submitBookingForm(page)
 
   await expect(page.getByTestId('booking-confirmation')).toBeVisible()
   await expect(firstDay.getByRole('button', { expanded: true })).toBeVisible()
@@ -665,15 +661,13 @@ test('guest sees the default day expansion again after a booking conflict', asyn
   const slots = await listSlots(request, id)
   const startsAt = slots.find((slot) => slot.isAvailable)?.startsAt
   if (!startsAt) throw new Error('No free slots left')
-  const firstDate = startsAt.slice(0, 10)
+  const firstDate = dayKey(startsAt)
   const otherDates = [
-    ...new Set(slots.map((slot) => slot.startsAt.slice(0, 10))),
+    ...dayKeys(slots),
   ].filter((item) => item !== firstDate)
   if (otherDates.length === 0) throw new Error('Expected at least two days')
 
-  await page.goto('/guest')
-  await page.getByRole('button', { name: new RegExp(title) }).click()
-  await expect(page.getByRole('heading', { name: 'Свободные слоты' })).toBeVisible()
+  await openMeetingType(page, title)
 
   await page.getByTestId('slot-toggle-all').click()
   await expect(page.getByTestId('slot-toggle-all')).toHaveText('Свернуть все')
@@ -681,19 +675,9 @@ test('guest sees the default day expansion again after a booking conflict', asyn
   const firstDay = dayByDate(page, firstDate)
   await firstDay.getByTestId('slot').first().click()
 
-  const taken = await request.post('/api/bookings', {
-    data: {
-      meetingTypeId: id,
-      startsAt,
-      guestName: 'Другой гость',
-      guestEmail: 'other@example.com',
-    },
-  })
-  expect(taken.status()).toBe(201)
+  await takeSlotViaApi(request, id, startsAt)
 
-  await page.getByLabel('Имя').fill('Анна')
-  await page.getByLabel('Почта').fill('anna@example.com')
-  await page.getByRole('button', { name: 'Забронировать' }).click()
+  await submitBookingForm(page)
 
   await expect(page.getByRole('alert')).toContainText('уже занят')
   await expect(firstDay.getByRole('button', { expanded: true })).toBeVisible()
@@ -702,5 +686,107 @@ test('guest sees the default day expansion again after a booking conflict', asyn
     await expect(otherDay.getByRole('button', { expanded: false })).toBeVisible()
     await expect(otherDay.getByTestId('slot')).toHaveCount(0)
   }
+})
+
+test('guest can collapse the selected day after booking a slot', async ({
+  page,
+  request,
+}) => {
+  const { id, title } = await createMeetingTypeViaApi(request, 30)
+  const slots = await listSlots(request, id)
+  const startsAt = slots.find((slot) => slot.isAvailable)?.startsAt
+  if (!startsAt) throw new Error('No free slots left')
+  const date = dayKey(startsAt)
+
+  await openMeetingType(page, title)
+
+  const day = dayByDate(page, date)
+  await day.getByTestId('slot').first().click()
+  await submitBookingForm(page)
+  await expect(page.getByTestId('booking-confirmation')).toBeVisible()
+
+  await expandDayIfCollapsed(page, date)
+  await day.getByRole('button', { expanded: true }).click()
+
+  await expect(day.getByRole('button', { expanded: false })).toBeVisible()
+  await expect(day.getByTestId('slot')).toHaveCount(0)
+})
+
+test('guest can collapse the selected day after a booking conflict', async ({
+  page,
+  request,
+}) => {
+  const { id, title } = await createMeetingTypeViaApi(request, 30)
+  const slots = await listSlots(request, id)
+  const startsAt = slots.find((slot) => slot.isAvailable)?.startsAt
+  if (!startsAt) throw new Error('No free slots left')
+  const date = dayKey(startsAt)
+
+  await openMeetingType(page, title)
+
+  const day = dayByDate(page, date)
+  await day.getByTestId('slot').first().click()
+
+  await takeSlotViaApi(request, id, startsAt)
+
+  await submitBookingForm(page)
+  await expect(page.getByRole('alert')).toContainText('уже занят')
+
+  await expandDayIfCollapsed(page, date)
+  await day.getByRole('button', { expanded: true }).click()
+
+  await expect(day.getByRole('button', { expanded: false })).toBeVisible()
+  await expect(day.getByTestId('slot')).toHaveCount(0)
+})
+
+test('guest keeps manually expanded days while the booking form is open', async ({
+  page,
+  request,
+}) => {
+  const { id, title } = await createMeetingTypeViaApi(request, 30)
+  const slots = await listSlots(request, id)
+  const firstAvailable = slots.find((slot) => slot.isAvailable)?.startsAt
+  const firstDate = firstAvailable ? dayKey(firstAvailable) : undefined
+  const secondAvailable = slots.find(
+    (slot) => slot.isAvailable && !slot.startsAt.startsWith(firstDate ?? ''),
+  )?.startsAt
+  const secondDate = secondAvailable ? dayKey(secondAvailable) : undefined
+  if (!firstDate || !secondDate) throw new Error('Expected free slots on two days')
+
+  await openMeetingType(page, title)
+
+  const firstDay = dayByDate(page, firstDate)
+  const secondDay = dayByDate(page, secondDate)
+  await secondDay.getByRole('button', { expanded: false }).click()
+  await expect(secondDay.getByTestId('slot').first()).toBeVisible()
+
+  await firstDay.getByTestId('slot').first().click()
+  await expect(page.getByRole('heading', { name: 'Данные гостя' })).toBeVisible()
+  await expect(secondDay.getByRole('button', { expanded: true })).toBeVisible()
+  await expect(secondDay.getByTestId('slot').first()).toBeVisible()
+
+  await page.getByRole('button', { name: 'Отменить' }).click()
+  await expect(page.getByRole('heading', { name: 'Данные гостя' })).toHaveCount(0)
+  await expect(secondDay.getByRole('button', { expanded: true })).toBeVisible()
+})
+
+test('guest toggles a day with the keyboard', async ({ page, request }) => {
+  const { id, title } = await createMeetingTypeViaApi(request)
+  const slots = await listSlots(request, id)
+  const date = slots[0] ? dayKey(slots[0].startsAt) : undefined
+  if (!date) throw new Error('No slots returned')
+
+  await openMeetingType(page, title)
+
+  const day = dayByDate(page, date)
+  const header = day.getByRole('button', { expanded: true })
+  await header.focus()
+  await page.keyboard.press('Enter')
+  await expect(day.getByRole('button', { expanded: false })).toBeVisible()
+  await expect(day.getByTestId('slot')).toHaveCount(0)
+
+  await page.keyboard.press('Space')
+  await expect(day.getByRole('button', { expanded: true })).toBeVisible()
+  await expect(day.getByTestId('slot').first()).toBeVisible()
 })
 
