@@ -164,6 +164,16 @@ Workflow `.github/workflows/opencode.yml` запускается на событ
 
 На свежем раннере доступны скиллы из `.agents/skills/` и настройки из `docs/agents/` — они лежат в репозитории и попадают в checkout.
 
+### Автотриаж новых обращений
+
+Workflow `.github/workflows/auto-triage.yml` запускается только на событие `issues: [opened]` и делает первичный триаж по скиллу `triage`. Закреплённый action `anomalyco/opencode/github` умеет работать только с событиями `issue_comment` и `pull_request_review_comment`, поэтому здесь используется CLI `opencode run` с зафиксированной версией `2.3.2`; установщик скачивается во временную директорию и проверяется по SHA-256 перед запуском. Модель та же — `opencode/big-pickle`, ключ по-прежнему лежит в Secrets как `OPENCODE_API_KEY` и не выводится в логи.
+
+Прогон запускается только если автор issue — владелец репозитория, это не бот, событие не относится к pull request и у issue нет ни одной из пяти state-меток (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). Благодаря этому готовые тикеты и спеки, которые создаёт агент с меткой `ready-for-agent`, автотриаж пропускает; материал из тела issue считается данными, а не инструкциями.
+
+Job имеет минимальные права: `contents: read` для checkout скиллов и документации и `issues: write` для меток и комментария. OIDC здесь не используется, поэтому `id-token: write` не выдаётся; `gh` внутри сессии получает короткоживущий `GH_TOKEN` из автоматического `GITHUB_TOKEN`. Ограничения: `timeout-minutes: 15`, concurrency на номер issue без отмены уже идущего прогона, `persist-credentials: false`.
+
+Агент применяет только начальное состояние: одну категорию (`bug` или `enhancement`) и `needs-triage`, затем публикует один комментарий с обязательным дисклеймером скилла и рекомендацией следующего состояния. Он не меняет код, не создаёт коммиты, ветки и pull request, не закрывает issue и не ставит `needs-info`, `ready-for-agent`, `ready-for-human` или `wontfix` без решения мейнтейнера. Прогон виден во вкладке Actions (`workflow: auto-triage`, имя `auto-triage issue #<n>`), результат — метки и комментарий в самом issue.
+
 ## Использование
 
 ```bash
