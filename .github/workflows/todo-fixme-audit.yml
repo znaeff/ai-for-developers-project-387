@@ -2,8 +2,8 @@ name: todo-fixme-audit
 
 on:
   schedule:
-    # Monday 09:00 Europe/Moscow (06:00 UTC)
-    - cron: '0 6 * * 1'
+    # Monday 09:17 UTC
+    - cron: '17 9 * * 1'
   workflow_dispatch:
 
 permissions: {}
