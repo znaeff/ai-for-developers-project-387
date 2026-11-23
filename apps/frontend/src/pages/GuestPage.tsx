@@ -170,7 +170,15 @@ export function GuestPage() {
           {!meetingTypesResource.isLoading &&
           !meetingTypesResource.error &&
           meetingTypes.length === 0 ? (
-            <p className="text-muted-foreground">Пока нет типов встреч.</p>
+            <>
+              <p className="text-muted-foreground">Пока нет типов встреч.</p>
+              <p className="text-sm text-muted-foreground">
+                Создать типы встреч{' '}
+                <a className="underline" href="/owner">
+                  здесь
+                </a>
+              </p>
+            </>
           ) : null}
 
           {meetingTypes.length > 0 ? (
