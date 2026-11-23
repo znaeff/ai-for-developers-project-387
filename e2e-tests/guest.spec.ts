@@ -481,6 +481,14 @@ test('guest books a slot and it becomes unavailable', {
 }, async ({ page, request }) => {
   const title = uniqueTitle('Бронирование')
 
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Календарь звонков' })).toBeVisible()
+
+  await page.goto('/guest')
+  const { message, hint } = emptyMeetingTypeTexts(page)
+  await expect(message).toBeVisible()
+  await expect(hint).toBeVisible()
+
   await createMeetingType(page, {
     title,
     description: 'Встреча с подтверждением',
