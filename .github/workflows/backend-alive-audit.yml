@@ -98,8 +98,8 @@ jobs:
           comments_today=$(gh issue view "$number" \
             --repo "$GITHUB_REPOSITORY" \
             --json comments \
-            --jq --arg date "$AUDIT_DATE" \
-            "[.comments[] | select(.createdAt | startswith(\$date))] | length")
+            | jq --arg date "$AUDIT_DATE" \
+            '[.comments[] | select(.createdAt | startswith($date))] | length')
 
           if [ "$created_date" = "$AUDIT_DATE" ] || [ "$comments_today" -gt 0 ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
@@ -175,7 +175,7 @@ jobs:
              `gh issue list --repo "$GITHUB_REPOSITORY" --state open --label audit --search '"Backend alive audit" in:title' --json number,title,state,url,createdAt`
           2. Если открытый issue есть:
              - проверь, не публиковался ли отчёт сегодня:
-               `gh issue view <number> --repo "$GITHUB_REPOSITORY" --json comments --jq --arg date "$AUDIT_DATE" '[.comments[] | select(.createdAt | startswith($date))] | length'`
+               `gh issue view <number> --repo "$GITHUB_REPOSITORY" --json comments | jq --arg date "$AUDIT_DATE" '[.comments[] | select(.createdAt | startswith($date))] | length'`
              - если `createdAt` issue начинается с AUDIT_DATE или сегодняшний комментарий уже есть,
                заверши работу без создания issue и без комментария;
              - иначе добавь ровно один комментарий с отчётом.
