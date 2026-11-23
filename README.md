@@ -207,6 +207,50 @@ Checkout выполняется по точному `head.sha` PR, а шаг п�
 
 После нового push появляется новый артефакт для нового SHA. Перед merge человек обязан сверить SHA в артефакте с текущим head SHA PR; старый артефакт доказательством не является. Требования к сценариям и артефакту зафиксированы в `REVIEW.md` и `.github/pull_request_template.md`.
 
+### Аудиты
+
+В репозитории работают два регулярных аудита. Оба используют текущую авторизацию проекта: `OPENCODE_API_KEY`, автоматический `GITHUB_TOKEN` и модель `opencode/big-pickle`; новых секретов не требуется. У каждого workflow есть ограничение по времени и `concurrency`, чтобы запуски не пересекались.
+
+#### Backend alive audit
+
+Workflow `.github/workflows/backend-alive-audit.yml` проверяет доступность опубликованного приложения.
+
+- Расписание: каждый час в `:17` UTC.
+- Ручной запуск: `workflow_dispatch`.
+- URL берётся из repository variable `APP_URL`, а не из файла репозитория.
+- Проверка: `GET $APP_URL/reserve`, ожидается HTTP `200` и тело `Reserved`.
+- При успехе: отчёт не создаётся, модель не вызывается; результат остаётся только в логе run.
+- При неудаче: агент ищет или создаёт issue `Backend alive audit` с меткой `audit` и добавляет комментарий с HTTP-статусом, `curl` exit code, временем, commit SHA и ссылкой на run. Job завершается ошибкой, чтобы сбой был виден в Actions.
+- Где смотреть:
+  - успех — run workflow `backend-alive-audit` во вкладке Actions;
+  - неудача — тот же run и issue `Backend alive audit`.
+
+#### TODO/FIXME audit
+
+Workflow `.github/workflows/todo-fixme-audit.yml` ищет технический долг в отслеживаемых файлах.
+
+- Расписание: каждый понедельник в `09:17` UTC.
+- Ручной запуск: `workflow_dispatch`.
+- Проверка: `TODO`, `FIXME`, `HACK`, `XXX`; generated-файлы и сам workflow исключены из поиска.
+- Агент ищет существующие issues и ссылается на релевантные, не создавая дубликаты.
+- Результат сохраняется всегда, даже если находок нет.
+- При отсутствии находок: комментарий с нулевыми счётчиками.
+- При находках: комментарий с таблицей `file:line`, типом, текстом и связанными issues.
+- Код не меняется; после агента workflow проверяет, что `git status --porcelain` пустой.
+- Где смотреть:
+  - issue [`TODO/FIXME audit log`](https://github.com/znaeff/ai-for-developers-project-387/issues/42);
+  - run workflow `todo-fixme-audit` во вкладке Actions.
+
+Для ручного запуска:
+
+```bash
+gh workflow run backend-alive-audit.yml \
+  --repo znaeff/ai-for-developers-project-387 --ref main
+
+gh workflow run todo-fixme-audit.yml \
+  --repo znaeff/ai-for-developers-project-387 --ref main
+```
+
 ## Использование
 
 ```bash
