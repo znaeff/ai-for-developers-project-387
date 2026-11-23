@@ -18,6 +18,8 @@
 * **ci:** run reviewer from isolated directory ([#26](https://github.com/znaeff/ai-for-developers-project-387/issues/26)) ([95cffe4](https://github.com/znaeff/ai-for-developers-project-387/commit/95cffe4e3d140796fc91ca07a2673a54be700021))
 * **ci:** use available OpenCode model ([#2](https://github.com/znaeff/ai-for-developers-project-387/issues/2)) ([934ec97](https://github.com/znaeff/ai-for-developers-project-387/commit/934ec97e81018f1b294961d33b9e78621ed5347a))
 
+> This release PR only finalizes the release: it records the version bump and changelog entries above. Application code is unchanged.
+
 ## [0.7.0](https://github.com/znaeff/ai-for-developers-project-386/compare/calendar-booking-v0.6.0...calendar-booking-v0.7.0) (2026-11-21)
 
 
