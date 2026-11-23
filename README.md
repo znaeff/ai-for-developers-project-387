@@ -220,10 +220,12 @@ Workflow `.github/workflows/backend-alive-audit.yml` проверяет дост
 - URL берётся из repository variable `APP_URL`, а не из файла репозитория.
 - Проверка: `GET $APP_URL/reserve`, ожидается HTTP `200` и тело `Reserved`.
 - При успехе: отчёт не создаётся, модель не вызывается; результат остаётся только в логе run.
-- При неудаче: агент ищет или создаёт issue `Backend alive audit` с меткой `audit` и добавляет комментарий с HTTP-статусом, `curl` exit code, временем, commit SHA и ссылкой на run. Job завершается ошибкой, чтобы сбой был виден в Actions.
+- При неудаче: агент ищет открытый issue `Backend alive audit` с меткой `audit`. Если открытого issue нет, он создаёт новый с отчётом в body; если открытый issue уже есть и сегодняшнего отчёта в нём нет, добавляет один комментарий с HTTP-статусом, `curl` exit code, временем, commit SHA и ссылкой на run.
+- Отчёты дедуплицируются по UTC-суткам: если открытый `Backend alive audit` уже создан или прокомментирован сегодня, новый issue и новый комментарий не создаются, модель не вызывается.
+- Закрытые issues не переоткрываются. Job всё равно завершается ошибкой при каждой неудаче, даже если отчёт уже был отправлен сегодня, чтобы недоступность backend оставалась видимой в Actions.
 - Где смотреть:
   - успех — run workflow `backend-alive-audit` во вкладке Actions;
-  - неудача — тот же run и issue `Backend alive audit`.
+  - неудача — тот же run и открытый issue `Backend alive audit`.
 
 #### TODO/FIXME audit
 
