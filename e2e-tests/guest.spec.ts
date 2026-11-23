@@ -26,7 +26,7 @@ function dayKeys(slots: SlotResponse[]) {
 function emptyMeetingTypeTexts(page: Page) {
   return {
     message: page.getByText('Пока нет типов встреч.', { exact: true }),
-    hint: page.getByText('Создать типы встреч здесь', { exact: true }),
+    hint: page.getByText('Создайте типы встреч здесь', { exact: true }),
   }
 }
 

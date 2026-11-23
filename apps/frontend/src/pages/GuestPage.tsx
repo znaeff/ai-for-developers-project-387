@@ -173,7 +173,7 @@ export function GuestPage() {
             <>
               <p className="text-muted-foreground">Пока нет типов встреч.</p>
               <p className="text-sm text-muted-foreground">
-                Создать типы встреч{' '}
+                Создайте типы встреч{' '}
                 <a className="underline" href="/owner">
                   здесь
                 </a>
