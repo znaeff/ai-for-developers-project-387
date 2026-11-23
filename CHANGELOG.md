@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1](https://github.com/znaeff/ai-for-developers-project-387/compare/calendar-booking-v0.8.0...calendar-booking-v0.8.1) (2026-11-23)
+
+
+### Bug Fixes
+
+* **ci:** exclude audit workflow from its own scan ([#41](https://github.com/znaeff/ai-for-developers-project-387/issues/41)) ([ad6dc4b](https://github.com/znaeff/ai-for-developers-project-387/commit/ad6dc4bebb362fa84449fbd13bf57d95326cc617))
+
 ## [0.8.0](https://github.com/znaeff/ai-for-developers-project-387/compare/calendar-booking-v0.7.0...calendar-booking-v0.8.0) (2026-11-22)
 
 
