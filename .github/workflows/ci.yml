@@ -31,3 +31,67 @@ jobs:
 
       - name: Run checks
         run: mise run check
+
+  head-browser-evidence:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout pull request head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Verify and record head SHA
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/head-browser"
+          actual=$(git rev-parse HEAD)
+          printf '%s\n' "$actual" | tee "$RUNNER_TEMP/head-browser/head-sha.txt"
+          test "$actual" = "$HEAD_SHA"
+
+      - name: Setup toolchain from mise.toml
+        uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run main and adjacent browser scenarios
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_FILE: ${{ runner.temp }}/head-browser/results.json
+        run: >-
+          pnpm test:browser:evidence
+          --output "$RUNNER_TEMP/head-browser/traces"
+
+      - name: Write evidence summary
+        if: always()
+        run: |
+          set -euo pipefail
+          summary="$RUNNER_TEMP/head-browser/summary.txt"
+          {
+            echo "head_sha=$(cat "$RUNNER_TEMP/head-browser/head-sha.txt")"
+            echo "artifact=head-browser-$(cat "$RUNNER_TEMP/head-browser/head-sha.txt")"
+            echo "scenarios=main,adjacent"
+            if [ -f "$RUNNER_TEMP/head-browser/results.json" ]; then
+              jq -r '.stats | "expected=\(.expected) unexpected=\(.unexpected) flaky=\(.flaky) skipped=\(.skipped) duration_ms=\(.duration)"' \
+                "$RUNNER_TEMP/head-browser/results.json"
+            else
+              echo "result=missing"
+            fi
+          } > "$summary"
+
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: head-browser-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/head-browser/
+          if-no-files-found: error

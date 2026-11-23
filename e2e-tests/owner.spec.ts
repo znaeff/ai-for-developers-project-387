@@ -46,10 +46,9 @@ test('owner sees an error for a duplicate duration', async ({ page }) => {
   await expect(page.getByRole('alert')).toContainText('уже существует')
 })
 
-test('owner sees a new booking after opening the page', async ({
-  context,
-  page,
-}) => {
+test('owner sees a new booking after opening the page', {
+  tag: '@head-browser-adjacent',
+}, async ({ context, page }) => {
   const title = uniqueTitle('Консультация гостя')
   const guestName = 'Пётр'
   const guestEmail = `petr-${Date.now()}@example.com`

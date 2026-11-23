@@ -13,6 +13,7 @@
     "test": "pnpm -r test",
     "test:scripts": "node --test scripts/tests/*.test.mjs",
     "test:e2e": "playwright test",
+    "test:browser:evidence": "playwright test --grep \"@head-browser-\" --trace on --reporter=list,json",
     "generate": "pnpm generate:openapi && pnpm generate:sdk",
     "generate:openapi": "tsp compile contracts",
     "generate:sdk": "openapi-ts -i ./contracts/openapi/openapi.json -o ./apps/frontend/src/api/generated",

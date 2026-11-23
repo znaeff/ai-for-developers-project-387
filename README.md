@@ -194,6 +194,17 @@ Workflow `.github/workflows/release-please.yml` запускается на push
 
 Включать настройку `Allow GitHub Actions to create and approve pull requests` не требуется. Для ручной проверки после изменения workflow используйте `gh workflow run release-please.yml --repo znaeff/ai-for-developers-project-387 --ref main`; release PR проходит обычный CI и мержится человеком.
 
+### Браузерные доказательства PR
+
+Job `head-browser-evidence` в `.github/workflows/ci.yml` запускается только на `pull_request`, работает без секретов и модели и проверяет два согласованных сценария:
+
+- `@head-browser-main` — Гость бронирует свободный Слот и видит подтверждение; Слот становится недоступным;
+- `@head-browser-adjacent` — Владелец открывает `/owner` и видит новую Бронь.
+
+Checkout выполняется по точному `head.sha` PR, а шаг проверки сравнивает `git rev-parse HEAD` с этим SHA и падает при расхождении. Результат складывается в артефакт `head-browser-<sha>`: `head-sha.txt`, `results.json`, `summary.txt` и Playwright traces в `traces/`. Артефакт загружается даже при падении тестов, чтобы был виден фактический результат.
+
+После нового push появляется новый артефакт для нового SHA. Перед merge человек обязан сверить SHA в артефакте с текущим head SHA PR; старый артефакт доказательством не является. Требования к сценариям и артефакту зафиксированы в `REVIEW.md` и `.github/pull_request_template.md`.
+
 ## Использование
 
 ```bash

@@ -388,10 +388,9 @@ test('guest sees an empty state when all slots are booked', async ({
   await expect(firstDay.getByTestId('slot').first()).toBeDisabled()
 })
 
-test('guest books a slot and it becomes unavailable', async ({
-  page,
-  request,
-}) => {
+test('guest books a slot and it becomes unavailable', {
+  tag: '@head-browser-main',
+}, async ({ page, request }) => {
   const title = uniqueTitle('Бронирование')
 
   await createMeetingType(page, {
