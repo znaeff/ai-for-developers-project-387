@@ -23,6 +23,13 @@ function dayKeys(slots: SlotResponse[]) {
   return [...new Set(slots.map((slot) => dayKey(slot.startsAt)))]
 }
 
+function emptyMeetingTypeTexts(page: Page) {
+  return {
+    message: page.getByText('Пока нет типов встреч.', { exact: true }),
+    hint: page.getByText('Создайте типы встреч здесь', { exact: true }),
+  }
+}
+
 function requireTwoDates(slots: SlotResponse[]) {
   const dates = dayKeys(slots)
   if (dates.length < 2) throw new Error('Expected at least two days')
@@ -147,6 +154,87 @@ async function createMeetingType(
 
   await expect(page.getByRole('listitem').filter({ hasText: input.title })).toBeVisible()
 }
+
+test('guest sees an owner link below the empty meeting type message', async ({
+  page,
+}) => {
+  await page.goto('/guest')
+
+  const { message, hint } = emptyMeetingTypeTexts(page)
+  await expect(message).toBeVisible()
+  await expect(hint).toBeVisible()
+
+  const links = hint.getByRole('link')
+  await expect(links).toHaveCount(1)
+  await expect(links.first()).toHaveText('здесь')
+  await expect(links.first()).toHaveAttribute('href', '/owner')
+
+  await links.first().click()
+  await expect(page).toHaveURL(/\/owner$/)
+  await expect(
+    page.getByRole('heading', { name: 'Управление календарём' }),
+  ).toBeVisible()
+})
+
+test('guest does not see the owner link when meeting types exist', async ({
+  page,
+  request,
+}) => {
+  await createMeetingTypeViaApi(request)
+
+  await page.goto('/guest')
+
+  const { message, hint } = emptyMeetingTypeTexts(page)
+  await expect(page.getByRole('button', { name: /Сворачивание/ })).toBeVisible()
+  await expect(message).toHaveCount(0)
+  await expect(hint).toHaveCount(0)
+})
+
+test('guest does not see the owner link while meeting types are loading', async ({
+  page,
+}) => {
+  let continueLoading = () => {}
+  const loading = new Promise<void>((resolve) => {
+    continueLoading = resolve
+  })
+  await page.route('**/api/meeting-types', async (route) => {
+    if (route.request().method() === 'GET') await loading
+    await route.continue()
+  })
+
+  const { message, hint } = emptyMeetingTypeTexts(page)
+
+  await page.goto('/guest', { waitUntil: 'commit' })
+
+  await expect(page.getByText('Загрузка типов встреч…')).toBeVisible()
+  await expect(hint).toHaveCount(0)
+
+  continueLoading()
+
+  await expect(message).toBeVisible()
+  await expect(hint).toBeVisible()
+})
+
+test('guest does not see the owner link when meeting types fail to load', async ({
+  page,
+}) => {
+  await page.route('**/api/meeting-types', async (route) => {
+    if (route.request().method() !== 'GET') return route.continue()
+    await route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'Тестовая ошибка загрузки' }),
+    })
+  })
+
+  const { message, hint } = emptyMeetingTypeTexts(page)
+
+  await page.goto('/guest')
+
+  await expect(page.getByRole('alert')).toContainText('Тестовая ошибка загрузки')
+  await expect(message).toHaveCount(0)
+  await expect(hint).toHaveCount(0)
+})
 
 test('guest sees only the nearest day with free slots expanded', async ({
   page,
@@ -392,6 +480,14 @@ test('guest books a slot and it becomes unavailable', {
   tag: '@head-browser-main',
 }, async ({ page, request }) => {
   const title = uniqueTitle('Бронирование')
+
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Календарь звонков' })).toBeVisible()
+
+  await page.goto('/guest')
+  const { message, hint } = emptyMeetingTypeTexts(page)
+  await expect(message).toBeVisible()
+  await expect(hint).toBeVisible()
 
   await createMeetingType(page, {
     title,
