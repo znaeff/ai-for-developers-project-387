@@ -1,0 +1,172 @@
+name: backend-alive-audit
+
+on:
+  schedule:
+    # Every hour at :17 UTC
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+run-name: "Backend alive audit"
+
+concurrency:
+  group: backend-alive-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+      BACKEND_URL: ${{ vars.APP_URL }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check backend health
+        id: health
+        shell: bash
+        run: |
+          set -euo pipefail
+          BACKEND_URL="${BACKEND_URL%/}"
+          if [ -z "$BACKEND_URL" ]; then
+            echo "APP_URL repository variable is not configured" >&2
+            exit 1
+          fi
+
+          body_file="$RUNNER_TEMP/backend-health-body.txt"
+          error_file="$RUNNER_TEMP/backend-health-error.txt"
+          status_file="$RUNNER_TEMP/backend-health-status.txt"
+
+          set +e
+          http_status=$(curl -fsS --max-time 90 \
+            -o "$body_file" \
+            -w '%{http_code}' \
+            "$BACKEND_URL/reserve" 2>"$error_file")
+          curl_status=$?
+          set -e
+
+          printf '%s\n' "$http_status" > "$status_file"
+
+          if [ "$curl_status" -eq 0 ] && [ "$http_status" = "200" ] && grep -qx 'Reserved' "$body_file"; then
+            result=success
+          else
+            result=failure
+          fi
+
+          echo "result=$result" >> "$GITHUB_OUTPUT"
+          echo "AUDIT_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+          echo "AUDIT_RUN_URL=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" >> "$GITHUB_ENV"
+
+          printf 'backend_url=%s\nresult=%s\nhttp_status=%s\ncurl_status=%s\n' \
+            "$BACKEND_URL" "$result" "$http_status" "$curl_status"
+
+      # Keep the CLI version and the installer checksum in sync when upgrading.
+      - name: Install OpenCode 2.3.2
+        shell: bash
+        run: |
+          curl -fsSL https://opencode.ai/v2/install -o "$RUNNER_TEMP/opencode-install.sh"
+          echo "b60226508704fc97d7b9d12ae6d4a6f819dfe02b22c190a0425c14ef632b056b  $RUNNER_TEMP/opencode-install.sh" | sha256sum -c -
+          bash "$RUNNER_TEMP/opencode-install.sh" --version 2.3.2 --no-modify-path
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+
+      - name: Report backend failure
+        if: steps.health.outputs.result == 'failure'
+        shell: bash
+        timeout-minutes: 5
+        env:
+          OPENCODE_CONFIG_CONTENT: |
+            {
+              "permission": {
+                "edit": "deny",
+                "write": "deny",
+                "webfetch": "deny",
+                "websearch": "deny"
+              }
+            }
+        run: |
+          set -euo pipefail
+          opencode run \
+            --auto \
+            --model opencode/big-pickle \
+            --title "backend-alive-audit $AUDIT_TIME" \
+            "$(cat <<'PROMPT'
+          Ты — дежурный агент аудита доступности backend. Health-check уже выполнен
+          и завершился неудачей.
+
+          Переменные окружения:
+          - BACKEND_URL — публичный URL приложения;
+          - AUDIT_TIME — время проверки в UTC;
+          - AUDIT_RUN_URL — ссылка на запуск workflow;
+          - GITHUB_SHA — проверяемый commit SHA;
+          - GITHUB_REPOSITORY — репозиторий;
+          - GH_TOKEN — токен для `gh`.
+
+          Файлы с результатом проверки:
+          - `$RUNNER_TEMP/backend-health-body.txt` — тело ответа;
+          - `$RUNNER_TEMP/backend-health-error.txt` — ошибка curl;
+          - `$RUNNER_TEMP/backend-health-status.txt` — HTTP status.
+
+          Жёсткие ограничения:
+          - Не меняй код и файлы репозитория.
+          - Не создавай ветки, коммиты и pull request.
+          - Не закрывай issues и не меняй существующие метки.
+          - Не печатай секреты и содержимое окружения.
+          - Работай только с $GITHUB_REPOSITORY.
+
+          Шаги:
+          1. Найди постоянный issue аудита:
+             `gh issue list --repo "$GITHUB_REPOSITORY" --state all --limit 100 --label audit --search '"Backend alive audit" in:title' --json number,title,state,url`
+             Если issue нет, создай его:
+             `gh issue create --repo "$GITHUB_REPOSITORY" --title "Backend alive audit" --label audit --body "Постоянный issue аудита доступности backend. Комментарии добавляются только при неудачной проверке `GET /reserve`."`
+             Если issue закрыт, открой его командой `gh issue reopen`.
+          2. Прочитай файлы результата проверки.
+          3. Добавь ровно один комментарий к issue с отчётом о неудаче.
+          4. Не создавай отдельный issue на каждый час.
+          5. В конце проверь, что `git status --porcelain` пустой.
+
+          Формат комментария:
+          ## Backend alive audit — failure
+
+          - Time: <AUDIT_TIME>
+          - URL: <BACKEND_URL>/reserve
+          - HTTP status: <status или "нет ответа">
+          - curl exit: <код>
+          - Commit: `<GITHUB_SHA>`
+          - Run: <AUDIT_RUN_URL>
+
+          ### Ответ
+
+          <тело ответа или ошибка curl; если пусто — "пустой ответ">
+
+          ### Итог
+
+          Backend не прошёл health-check: ожидался HTTP 200 с телом `Reserved`.
+
+          Пиши отчёт по-русски. Не выдумывай данные.
+          PROMPT
+          )"
+
+      - name: Verify no repository changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          status=$(git status --porcelain)
+          if [ -n "$status" ]; then
+            printf '%s\n' "$status"
+            echo "Backend alive audit must not modify the repository" >&2
+            exit 1
+          fi
+
+      - name: Fail the workflow when backend is unavailable
+        if: steps.health.outputs.result == 'failure'
+        run: exit 1
