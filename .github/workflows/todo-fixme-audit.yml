@@ -1,0 +1,153 @@
+name: todo-fixme-audit
+
+on:
+  schedule:
+    # Monday 09:00 Europe/Moscow (06:00 UTC)
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions: {}
+
+run-name: "TODO/FIXME audit"
+
+concurrency:
+  group: todo-fixme-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Ensure audit label
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! gh label list --repo "$GITHUB_REPOSITORY" --limit 100 --json name --jq '.[].name' | grep -qx 'audit'; then
+            gh label create audit \
+              --repo "$GITHUB_REPOSITORY" \
+              --color "0e8a16" \
+              --description "Weekly TODO/FIXME audit log"
+          fi
+
+      # Keep the CLI version and the installer checksum in sync when upgrading.
+      - name: Install OpenCode 2.3.2
+        shell: bash
+        run: |
+          curl -fsSL https://opencode.ai/v2/install -o "$RUNNER_TEMP/opencode-install.sh"
+          echo "b60226508704fc97d7b9d12ae6d4a6f819dfe02b22c190a0425c14ef632b056b  $RUNNER_TEMP/opencode-install.sh" | sha256sum -c -
+          bash "$RUNNER_TEMP/opencode-install.sh" --version 2.3.2 --no-modify-path
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+
+      - name: Run TODO/FIXME audit
+        shell: bash
+        timeout-minutes: 12
+        env:
+          OPENCODE_CONFIG_CONTENT: |
+            {
+              "permission": {
+                "edit": "deny",
+                "write": "deny",
+                "webfetch": "deny",
+                "websearch": "deny"
+              }
+            }
+        run: |
+          set -euo pipefail
+          AUDIT_DATE="$(date -u +%F)"
+          export AUDIT_DATE
+          export AUDIT_COMMIT_SHA="$GITHUB_SHA"
+          export AUDIT_RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          opencode run \
+            --auto \
+            --model opencode/big-pickle \
+            --title "todo-fixme-audit $AUDIT_DATE" \
+            "$(cat <<'PROMPT'
+          Ты выполняешь еженедельный аудит TODO/FIXME в GitHub-репозитории.
+
+          Переменные окружения:
+          - AUDIT_DATE — дата аудита в формате YYYY-MM-DD;
+          - AUDIT_COMMIT_SHA — проверяемый commit SHA;
+          - AUDIT_RUN_URL — ссылка на этот запуск workflow;
+          - GITHUB_REPOSITORY — репозиторий;
+          - GH_TOKEN — токен для `gh`.
+
+          Жёсткие ограничения:
+          - Не меняй код и файлы репозитория.
+          - Не создавай ветки, коммиты и pull request.
+          - Не закрывай issues и не меняй существующие метки.
+          - Не печатай секреты и содержимое окружения.
+          - Работай только с $GITHUB_REPOSITORY.
+
+          Шаги:
+          1. Прочитай AGENTS.md, REVIEW.md и docs/agents/issue-tracker.md.
+          2. Найди TODO/FIXME/HACK/XXX в отслеживаемых файлах:
+             `git grep -nE '\b(TODO|FIXME|HACK|XXX)\b' -- . ':!node_modules' ':!dist' ':!test-results' ':!playwright-report' ':!contracts/openapi' ':!apps/frontend/src/api/generated'`
+             Если совпадений нет, это нормальный результат: счётчики равны 0.
+          3. Посчитай все находки по типам. В таблицу отчёта включи не более 50
+             находок; если их больше, укажи общее число и первые 50.
+          4. Найди постоянный issue аудита:
+             `gh issue list --repo "$GITHUB_REPOSITORY" --state all --limit 100 --search '"TODO/FIXME audit log" in:title' --json number,title,state,url`
+             Выбери один issue `TODO/FIXME audit log`.
+             - Если он закрыт, открой его командой `gh issue reopen`.
+             - Если issue нет, создай его:
+               `gh issue create --repo "$GITHUB_REPOSITORY" --title "TODO/FIXME audit log" --label audit --body "Постоянный issue еженедельного аудита TODO/FIXME. Каждый запуск добавляет отдельный комментарий с результатом."`
+          5. Для каждой находки, но не более чем для 10 файлов, поищи существующие issues:
+             `gh issue list --repo "$GITHUB_REPOSITORY" --state all --limit 20 --search "<путь или ключевой текст>" --json number,title,state,url`
+             Ссылайся на релевантные issues. Не создавай отдельный issue на каждую находку.
+          6. Всегда добавь ровно один комментарий к audit log issue, даже если находок нет:
+             `gh issue comment <number> --repo "$GITHUB_REPOSITORY" --body "<отчёт>"`
+          7. В конце проверь, что `git status --porcelain` пустой.
+
+          Формат комментария:
+          ## TODO/FIXME audit — $AUDIT_DATE
+
+          - Commit: `<sha>`
+          - Run: <url>
+          - TODO: N
+          - FIXME: N
+          - HACK: N
+          - XXX: N
+
+          ### Находки
+
+          | Файл | Строка | Тип | Текст | Связанные issues |
+          | --- | --- | --- | --- | --- |
+
+          Если находок нет, вместо таблицы напиши:
+          `TODO/FIXME/HACK/XXX не найдены.`
+
+          ### Существующие issues
+
+          Перечисли найденные связанные issues или напиши, что совпадений нет.
+
+          ### Итог
+
+          Найдено N мест. / TODO/FIXME/HACK/XXX не найдены.
+
+          Пиши отчёт по-русски. Не выдумывай находки и связанные issues.
+          PROMPT
+          )"
+
+      - name: Verify no repository changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          status=$(git status --porcelain)
+          if [ -n "$status" ]; then
+            printf '%s\n' "$status"
+            echo "TODO/FIXME audit must not modify the repository" >&2
+            exit 1
+          fi
