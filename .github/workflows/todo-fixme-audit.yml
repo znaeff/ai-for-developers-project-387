@@ -94,7 +94,7 @@ jobs:
           Шаги:
           1. Прочитай AGENTS.md, REVIEW.md и docs/agents/issue-tracker.md.
           2. Найди TODO/FIXME/HACK/XXX в отслеживаемых файлах:
-             `git grep -nE '\b(TODO|FIXME|HACK|XXX)\b' -- . ':!node_modules' ':!dist' ':!test-results' ':!playwright-report' ':!contracts/openapi' ':!apps/frontend/src/api/generated'`
+             `git grep -nE '\b(TODO|FIXME|HACK|XXX)\b' -- . ':!node_modules' ':!dist' ':!test-results' ':!playwright-report' ':!contracts/openapi' ':!apps/frontend/src/api/generated' ':!.github/workflows/todo-fixme-audit.yml'`
              Если совпадений нет, это нормальный результат: счётчики равны 0.
           3. Посчитай все находки по типам. В таблицу отчёта включи не более 50
              находок; если их больше, укажи общее число и первые 50.
