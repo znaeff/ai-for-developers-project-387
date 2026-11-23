@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.2](https://github.com/znaeff/ai-for-developers-project-387/compare/calendar-booking-v0.8.1...calendar-booking-v0.8.2) (2026-11-23)
+
+
+### Bug Fixes
+
+* **ci:** dedupe backend audit reports per UTC day ([#47](https://github.com/znaeff/ai-for-developers-project-387/issues/47)) ([b145303](https://github.com/znaeff/ai-for-developers-project-387/commit/b145303794b95a857b153f639c283a4733ec0af4))
+* **ci:** use jq for backend audit dedupe ([#47](https://github.com/znaeff/ai-for-developers-project-387/issues/47)) ([b17e459](https://github.com/znaeff/ai-for-developers-project-387/commit/b17e459d795895e9b4d8f8c227c761bf48f37331))
+
 ## [0.8.1](https://github.com/znaeff/ai-for-developers-project-387/compare/calendar-booking-v0.8.0...calendar-booking-v0.8.1) (2026-11-23)
 
 
