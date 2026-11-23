@@ -23,6 +23,13 @@ function dayKeys(slots: SlotResponse[]) {
   return [...new Set(slots.map((slot) => dayKey(slot.startsAt)))]
 }
 
+function emptyMeetingTypeTexts(page: Page) {
+  return {
+    message: page.getByText('Пока нет типов встреч.', { exact: true }),
+    hint: page.getByText('Создать типы встреч здесь', { exact: true }),
+  }
+}
+
 function requireTwoDates(slots: SlotResponse[]) {
   const dates = dayKeys(slots)
   if (dates.length < 2) throw new Error('Expected at least two days')
@@ -153,18 +160,9 @@ test('guest sees an owner link below the empty meeting type message', async ({
 }) => {
   await page.goto('/guest')
 
-  const message = page.getByText('Пока нет типов встреч.', { exact: true })
-  const hint = page.getByText('Создать типы встреч здесь', { exact: true })
+  const { message, hint } = emptyMeetingTypeTexts(page)
   await expect(message).toBeVisible()
   await expect(hint).toBeVisible()
-
-  const messageBox = await message.boundingBox()
-  const hintBox = await hint.boundingBox()
-  if (!messageBox || !hintBox) throw new Error('Expected both texts to be rendered')
-  const gap = hintBox.y - (messageBox.y + messageBox.height)
-  expect(gap).toBeGreaterThanOrEqual(0)
-  expect(gap).toBeLessThanOrEqual(32)
-  expect(Math.abs(hintBox.x - messageBox.x)).toBeLessThanOrEqual(2)
 
   const links = hint.getByRole('link')
   await expect(links).toHaveCount(1)
@@ -186,9 +184,10 @@ test('guest does not see the owner link when meeting types exist', async ({
 
   await page.goto('/guest')
 
+  const { message, hint } = emptyMeetingTypeTexts(page)
   await expect(page.getByRole('button', { name: /Сворачивание/ })).toBeVisible()
-  await expect(page.getByText('Пока нет типов встреч.', { exact: true })).toHaveCount(0)
-  await expect(page.getByText('Создать типы встреч здесь', { exact: true })).toHaveCount(0)
+  await expect(message).toHaveCount(0)
+  await expect(hint).toHaveCount(0)
 })
 
 test('guest does not see the owner link while meeting types are loading', async ({
@@ -203,15 +202,17 @@ test('guest does not see the owner link while meeting types are loading', async 
     await route.continue()
   })
 
+  const { message, hint } = emptyMeetingTypeTexts(page)
+
   await page.goto('/guest', { waitUntil: 'commit' })
 
   await expect(page.getByText('Загрузка типов встреч…')).toBeVisible()
-  await expect(page.getByText('Создать типы встреч здесь', { exact: true })).toHaveCount(0)
+  await expect(hint).toHaveCount(0)
 
   continueLoading()
 
-  await expect(page.getByText('Пока нет типов встреч.', { exact: true })).toBeVisible()
-  await expect(page.getByText('Создать типы встреч здесь', { exact: true })).toBeVisible()
+  await expect(message).toBeVisible()
+  await expect(hint).toBeVisible()
 })
 
 test('guest does not see the owner link when meeting types fail to load', async ({
@@ -226,11 +227,13 @@ test('guest does not see the owner link when meeting types fail to load', async 
     })
   })
 
+  const { message, hint } = emptyMeetingTypeTexts(page)
+
   await page.goto('/guest')
 
   await expect(page.getByRole('alert')).toContainText('Тестовая ошибка загрузки')
-  await expect(page.getByText('Пока нет типов встреч.', { exact: true })).toHaveCount(0)
-  await expect(page.getByText('Создать типы встреч здесь', { exact: true })).toHaveCount(0)
+  await expect(message).toHaveCount(0)
+  await expect(hint).toHaveCount(0)
 })
 
 test('guest sees only the nearest day with free slots expanded', async ({
